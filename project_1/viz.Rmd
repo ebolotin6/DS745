@@ -82,20 +82,14 @@ world_stats <- world_stats %>% mutate(ci_rating = case_when(
                                       cpi < 90 & cpi >= 50 ~ "somewhat corrupt",
                                       cpi < 50 & cpi >= 25 ~ "clean",
                                       cpi < 25 ~ "very clean"))
-```
 
-```{r}
 # drop NAs
-world_stats <- world_stats[complete.cases(world_stats$gdp) & complete.cases(world_stats$cpi),]
+world_stats <- world_stats[which(!is.na(world_stats$gdp) & !is.na(world_stats$cpi)),]
 ```
-
 
 ## Graph 1
 
 ```{r}
-# ggplot(world_stats, aes(corruption_index, gdp, label = Country.Name)) +
-#   geom_label()
-
 world_stats_2018 = world_stats[world_stats$year==2018,]
 
 ggplot(world_stats_2018, aes(x=cpi, y=gdp))+
