@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(ggplot2)
 library(dplyr)
 library(reshape)
+library(ggrepel)
 ```
 
 ## Load and transform data
@@ -43,7 +44,7 @@ colnames(world_stats)[c(2,3,4,5,6,7,8,9,10,11)] <- c("year","adolescent_fertilit
 world_stats$gdp <- as.numeric(levels(world_stats$gdp))[world_stats$gdp]
 world_stats$mortality_rate <- as.numeric(levels(world_stats$mortality_rate))[world_stats$mortality_rate]
 
-world_stats$gdp <- world_stats$gdp/10000000000
+world_stats$gdp <- world_stats$gdp/(1000000000)
 ```
 
 ## Add corruption index to data
@@ -117,6 +118,18 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
   scale_colour_brewer(palette = "RdYlGn", direction=-1, name = "Corruption Level", labels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt")) +
+  geom_point(colour = "grey90", size = .1) +
+  geom_text_repel(
+    data = subset(world_stats_2018, gdp >= 4000), 
+    aes(label=Country.Name),
+    nudge_y      = 45,
+    direction    = "both",
+    angle        = 0,
+    segment.color = "grey88",
+    segment.size = .2,
+    segment.alpha = .9,
+    size = 3.5,
+    vjust        = 0) +
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 ```
