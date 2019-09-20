@@ -18,7 +18,7 @@ library(reshape)
 ```
 
 ## Load and transform data
-```{r}
+```{r message=FALSE, warning=FALSE}
 # Load data
 world_stats <- read.csv("data.csv")
 
@@ -38,14 +38,12 @@ world_stats <- world_stats[,-c(5,12:16)]
 
 # rename metrics
 colnames(world_stats)[c(2,3,4,5,6,7,8,9,10,11)] <- c("year","adolescent_fertility","gdp","life_expectancy","mortality_rate","net_migration","prem","pop_growth","pop_total","surface_area")
-```
 
-## convert columns and change units
-```{r message=FALSE, warning=FALSE}
-# convert to numeric
+# convert cols to numeric
 world_stats$gdp <- as.numeric(levels(world_stats$gdp))[world_stats$gdp]
+world_stats$mortality_rate <- as.numeric(levels(world_stats$mortality_rate))[world_stats$mortality_rate]
 
-world_stats$gdp <- world_stats$gdp/1000000
+world_stats$gdp <- world_stats$gdp/10000000000
 ```
 
 ## Add corruption index to data
@@ -57,10 +55,8 @@ ci_df <- ci_df[,-c(1,2,4,7)]
 ci_df <- ci_df[ci_df$time==2018,c(1,3)]
 colnames(ci_df) <- c("Country.Name","cpi")
 ci_df$Country.Name <- as.character(ci_df$Country.Name)
-```
 
-
-```{r}
+# synchronize names between tables
 countries <- levels(droplevels(world_stats$Country.Name))
 
 for(country in countries) {
@@ -71,6 +67,7 @@ for(country in countries) {
 }
 ```
 
+## Add categorical features
 
 ```{r message=FALSE, warning=FALSE}
 world_stats <- full_join(world_stats, ci_df, by = "Country.Name")
@@ -83,18 +80,50 @@ world_stats <- world_stats %>% mutate(ci_rating = case_when(
                                       cpi < 50 & cpi >= 25 ~ "clean",
                                       cpi < 25 ~ "very clean"))
 
+world_stats <- world_stats %>% mutate(mortality_cat = case_when(
+                                      mortality_rate <= 15 ~ "low",
+                                      mortality_rate > 15 & mortality_rate <= 30 ~ "medium",
+                                      mortality_rate > 30 ~ "high"))
+
 # drop NAs
-world_stats <- world_stats[which(!is.na(world_stats$gdp) & !is.na(world_stats$cpi)),]
+world_stats <- world_stats[which(!is.na(world_stats$gdp) & !is.na(world_stats$cpi) & !is.na(world_stats$mortality_cat)),]
+
+# create df for 2018
+world_stats_2018 = world_stats[world_stats$year==2018,]
+world_stats_2018$ci_rating <- factor(world_stats_2018$ci_rating, levels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt"))
 ```
 
 ## Graph 1
 
 ```{r}
-world_stats_2018 = world_stats[world_stats$year==2018,]
-
-ggplot(world_stats_2018, aes(x=cpi, y=gdp))+
-  geom_bar(stat="identity", color="black")
+ggplot(data = world_stats_2018)+
+  geom_point(aes(x=cpi, y=mortality_rate, fill=gdp)) + 
+  scale_x_continuous(labels = scales::comma)
 ```
+
+## Graph 2
+
+```{r}
+p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
+p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
+  geom_point(colour = "grey90", size = 1.5) +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+```
+
+## Graph 3
+
+```{r}
+p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
+p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
+  scale_colour_brewer(palette = "RdYlGn", direction=-1, name = "Corruption Level", labels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt")) +
+  theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+```
+
+
+
+
 
 
 
