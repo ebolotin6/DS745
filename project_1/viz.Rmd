@@ -56,17 +56,38 @@ ci_df <- ci_df[,-c(1,2,4,7)]
 ci_df <- ci_df[ci_df$time==2018,c(1,3)]
 colnames(ci_df) <- c("Country.Name","cpi")
 ci_df$Country.Name <- as.character(ci_df$Country.Name)
+```
 
-# synchronize names between tables
-countries <- levels(droplevels(world_stats$Country.Name))
+## Synchronize names between tables
 
-for(country in countries) {
-  j = agrep(country, ci_df$Country.Name, ignore.case = FALSE, value = FALSE, max.distance = 0.1)
+```{r}
+countries_ws <- levels(droplevels(world_stats$Country.Name))
+countries_ci <- ci_df$Country.Name
+
+already_renamed = list()
+idx = 0
+'%ni%' <- Negate('%in%')
+
+for(country in countries_ws) {
+  j = agrep(country, countries_ci, ignore.case = FALSE, value = FALSE, max.distance = 0.1)
   if(length(j) == 1) {
     levels(world_stats$Country.Name)[levels(world_stats$Country.Name) == country] <- ci_df$Country.Name[j]
+    already_renamed[idx] <- ci_df$Country.Name[j]
+  }
+  idx = idx + 1
+}
+
+for(i in 1:nrow(ci_df)) {
+  if(ci_df$Country.Name[i] %ni% already_renamed) {
+    j = agrep(ci_df$Country.Name[i], countries_ws, ignore.case = FALSE, value = FALSE, max.distance = 0.1)
+    if(length(j) == 1) {
+      ci_df$Country.Name[i] <- countries_ws[j]
+    }
   }
 }
 ```
+
+
 
 ## Add categorical features
 
@@ -76,8 +97,8 @@ world_stats <- full_join(world_stats, ci_df, by = "Country.Name")
 # update world stats table with corruption level
 world_stats <- world_stats %>% mutate(ci_rating = case_when(
                                       cpi >= 120  ~ "very corrupt",
-                                      cpi < 120 & cpi >= 90 ~ "corrupt",
-                                      cpi < 90 & cpi >= 50 ~ "somewhat corrupt",
+                                      cpi < 120 & cpi >= 70 ~ "corrupt",
+                                      cpi < 70 & cpi >= 50 ~ "somewhat corrupt",
                                       cpi < 50 & cpi >= 25 ~ "clean",
                                       cpi < 25 ~ "very clean"))
 
@@ -118,20 +139,25 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
   scale_colour_brewer(palette = "RdYlGn", direction=-1, name = "Corruption Level", labels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt")) +
-  geom_point(colour = "grey90", size = .1) +
+  geom_point(colour = "grey100", size = 1.5) +
   geom_text_repel(
-    data = subset(world_stats_2018, gdp >= 4000), 
+    data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","France","Italy","India","Denmark","Russian Federation")), 
     aes(label=Country.Name),
-    nudge_y      = 45,
-    direction    = "both",
+    nudge_y      = 55,
+    direction    = "y",
     angle        = 0,
-    segment.color = "grey88",
+    segment.color = "grey50",
     segment.size = .2,
     segment.alpha = .9,
     size = 3.5,
+    point.padding = 1,
+    arrow = arrow(length=unit(0.03,"npc"), type="closed"),
     vjust        = 0) +
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
-  panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
+  panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
+  labs(title="Mortality Rate vs Corruption in Countries", subtitle = "Data collected from World Bank and Corruption Perception Index") +
+  labs(x ="Corruption Perception Index", y = "Mortality Rate (< 5 yrs)") + 
+  theme(plot.title = element_text(size=18))
 ```
 
 
