@@ -28,12 +28,15 @@ world_stats <- world_stats[-c(28:nrow(world_stats)),]
 
 # Rename year columns
 cols_containing_x <- names(world_stats[, grepl( "X" , names(world_stats) )])
-new_names <- substring(cols_containing_x, 1, 5)
+new_names <- substring(cols_containing_x, 2, 5)
 colnames(world_stats)[colnames(world_stats) %in% cols_containing_x] <- new_names
 
 # Reshape data
 md <- melt(world_stats, id=(c("Country.Name","Series.Name")))
 world_stats <- cast(md, "Country.Name+variable~Series.Name")
+
+# rename metrics
+colnames(world_stats)[c(3,4,5)] <- c("gdp","population","surface_area")
 ```
 
 ## Add corruption index to data
