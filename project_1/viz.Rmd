@@ -1,0 +1,80 @@
+---
+title: "project_1"
+author: "Eli (Ilya) Bolotin"
+date: "9/19/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dplyr)
+library(reshape)
+```
+
+## Load and transform data
+```{r}
+# Load data
+world_stats <- read.csv("data.csv")
+
+# Drop some columns, rows
+world_stats <- select(world_stats, -c(Series.Code, Country.Code))
+world_stats <- world_stats[-c(28:nrow(world_stats)),]
+
+# Rename year columns
+cols_containing_x <- names(world_stats[, grepl( "X" , names(world_stats) )])
+new_names <- substring(cols_containing_x, 1, 5)
+colnames(world_stats)[colnames(world_stats) %in% cols_containing_x] <- new_names
+
+# Reshape data
+md <- melt(world_stats, id=(c("Country.Name","Series.Name")))
+world_stats <- cast(md, "Country.Name+variable~Series.Name")
+```
+
+## Add corruption index to data
+
+```{r message=FALSE, warning=FALSE}
+# define countries
+countries = levels(droplevels(world_stats$Country.Name))
+
+# create corruption index lookup table
+ci_df = data.frame("Country.Name" = countries, corruption_index = c(81,39,88,72,57,28,85,36,71))
+world_stats <- inner_join(world_stats, ci_df, by = "Country.Name")
+
+# update world stats table with corruption level
+world_stats <- world_stats %>% mutate(corruption_level = case_when(corruption_index <= 35  ~ "very corrupt", corruption_index > 35 & corruption_index <= 50 ~ "corrupt", corruption_index > 50 & corruption_index <= 60 ~ "somewhat corrupt", corruption_index > 60 & corruption_index <= 75 ~ "clean", corruption_index > 75 ~ "very clean"))
+```
+
+## Rename year columns
+
+```{r}
+cols_containing_x <- names(world_stats[, grepl( "X" , names(world_stats) )])
+new_names <- substring(cols_containing_x, 2, 5)
+colnames(world_stats)[colnames(world_stats) %in% cols_containing_x] <- new_names
+```
+
+## Data filtered
+
+```{r}
+world_stats_2018 <- select(world_stats, -c(as.character(2016:2017)))
+```
+
+```{r}
+test <- aggregate(world_stats_2018, by, FUN)
+```
+
+
+## Graph
+
+```{r}
+ggplot(data = world_stats_2018) + 
+  geom_bar(mapping = aes(x = corruption_level, fill = "GDP (current US$)"))
+```
+
+
+
