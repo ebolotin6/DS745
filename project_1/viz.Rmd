@@ -24,7 +24,7 @@ world_stats <- read.csv("data.csv")
 
 # Drop some columns, rows
 world_stats <- select(world_stats, -c(Series.Code, Country.Code))
-world_stats <- world_stats[-c(28:nrow(world_stats)),]
+world_stats <- world_stats[-c((nrow(world_stats)-5):nrow(world_stats)),]
 
 # Rename year columns
 cols_containing_x <- names(world_stats[, grepl( "X" , names(world_stats) )])
@@ -34,9 +34,10 @@ colnames(world_stats)[colnames(world_stats) %in% cols_containing_x] <- new_names
 # Reshape data
 md <- melt(world_stats, id=(c("Country.Name","Series.Name")))
 world_stats <- cast(md, "Country.Name+variable~Series.Name")
+world_stats <- world_stats[,-c(5,12:16)]
 
 # rename metrics
-colnames(world_stats)[c(3,4,5)] <- c("gdp","population","surface_area")
+colnames(world_stats)[c(2,3,4,5,6,7,8,9,10,11)] <- c("year","adolescent_fertility","gdp","life_expectancy","mortality_rate","net_migration","prem","pop_growth","pop_total","surface_area")
 ```
 
 ## Add corruption index to data
@@ -53,30 +54,14 @@ world_stats <- inner_join(world_stats, ci_df, by = "Country.Name")
 world_stats <- world_stats %>% mutate(corruption_level = case_when(corruption_index <= 35  ~ "very corrupt", corruption_index > 35 & corruption_index <= 50 ~ "corrupt", corruption_index > 50 & corruption_index <= 60 ~ "somewhat corrupt", corruption_index > 60 & corruption_index <= 75 ~ "clean", corruption_index > 75 ~ "very clean"))
 ```
 
-## Rename year columns
-
-```{r}
-cols_containing_x <- names(world_stats[, grepl( "X" , names(world_stats) )])
-new_names <- substring(cols_containing_x, 2, 5)
-colnames(world_stats)[colnames(world_stats) %in% cols_containing_x] <- new_names
-```
-
-## Data filtered
-
-```{r}
-world_stats_2018 <- select(world_stats, -c(as.character(2016:2017)))
-```
-
-```{r}
-test <- aggregate(world_stats_2018, by, FUN)
-```
-
-
 ## Graph
 
 ```{r}
-ggplot(data = world_stats_2018) + 
-  geom_bar(mapping = aes(x = corruption_level, fill = "GDP (current US$)"))
+# ggplot(world_stats, aes(corruption_index, gdp, label = Country.Name)) +
+#   geom_label()
+
+ggplot(world_stats[world_stats$year == 2018,], aes(x=log(population), y=log(gdp), fill=corruption_index))+
+  geom_bar(stat="identity", color="black")
 ```
 
 
