@@ -121,25 +121,43 @@ world_stats_2018 = world_stats[world_stats$year==2018,]
 world_stats_2018$ci_rating <- factor(world_stats_2018$ci_rating, levels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt"))
 ```
 
-## Graph 1
+## Visualization 1
+
+In the first visualization, mortality rate is plotted against corruption to get a sense of correlation between the two variables.
 
 ```{r}
 ggplot(data = world_stats_2018)+
-  geom_point(aes(x=cpi, y=mortality_rate, fill=gdp)) + 
+  geom_point(aes(x=cpi, y=mortality_rate)) + 
   scale_x_continuous(labels = scales::comma)
 ```
 
-## Graph 2
+## Visualization 2
+
+In the second visualiation:
+
+* Color is introduced to segment the corruption rating of different countries
+* Point size is increased for readability
+* The graph grid is removed and axes cleaned up
+
 
 ```{r}
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
-p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
-  geom_point(colour = "grey90", size = 1.5) +
+p + geom_point(aes(colour = factor(ci_rating)), size = 3) +
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 ```
 
-## Graph 3
+## Visualization 3
+
+The final visualization:
+
+* Adds title and subtitle
+* Adds X and Y axis titles
+* Adjusts size of x and y axis labels
+* Adds size dimension to points, indicating GDP of country
+* Adds country labels to points
+* Adds red color scheme indicating level of mortality (darker=higher mortality)
+
 
 ```{r}
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
@@ -147,7 +165,7 @@ p + geom_point(aes(colour = factor(ci_rating), size = gdp)) +
   scale_size("GDP", breaks=c(5000,10000,15000,20000), labels=c("$5t","$10t","$15t","$20t")) +    
   scale_colour_brewer(palette = "Reds", 
                       direction=1, 
-                      name = "Corruption Level", 
+                      name = "Corruption Ranking", 
                       labels = c("Very clean", "Clean", "Somewhat corrupt", "Corrupt", "Very corrupt")) +
   geom_text_repel(
     data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","Portugal","Italy","India","Denmark","Russian Federation","Angola","Afghanistan")), 
@@ -166,9 +184,9 @@ p + geom_point(aes(colour = factor(ci_rating), size = gdp)) +
                      panel.grid.major = element_blank(),
                       panel.grid.minor = element_blank(), 
                      axis.line = element_line(colour = "black")) +
-  labs(title="Global Infant Mortality vs Corruption and GDP", 
+  labs(title="Global Infant Mortality vs Corruption", 
        subtitle = "Data collected from World Bank and Corruption Perception Index",
-       x ="Corruption Perception Index", 
+       x ="Corruption Ranking", 
        y = "Infant mortality Rate (in 1000 live births)") + 
   theme(plot.title = element_text(size=18),
         plot.subtitle = element_text(size=10),
