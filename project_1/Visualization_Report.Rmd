@@ -1,8 +1,12 @@
 ---
 title: "Project 1: Visualizations"
 author: "Eli (Ilya) Bolotin"
-date: "9/19/2019"
+date: "9/21/2019"
+geometry: margin=1.5cm
 output: pdf_document
+header-includes:
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 ---
 
 ```{r setup, include=FALSE}
@@ -12,18 +16,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Load libraries
 
 ```{r message=FALSE, warning=FALSE}
-library(ggplot2)
-library(dplyr)
-library(reshape)
-library(ggrepel)
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(ggplot2, dplyr, reshape, ggrepel)
 ```
 
 ## Load and transform data
+
 ```{r message=FALSE, warning=FALSE}
 # Load data
 world_stats <- read.csv("data.csv")
 
-# Drop some columns, rows
+# Drop columns, rows
 world_stats <- select(world_stats, -c(Series.Code, Country.Code))
 world_stats <- world_stats[-c((nrow(world_stats)-5):nrow(world_stats)),]
 
@@ -37,28 +40,23 @@ md <- melt(world_stats, id=(c("Country.Name","Series.Name")))
 world_stats <- cast(md, "Country.Name+variable~Series.Name")
 world_stats <- world_stats[,-c(5,12:16)]
 
-# rename metrics
+# Rename metrics
 colnames(world_stats)[c(2,3,4,5,6,7,8,9,10,11)] <- c("year","adolescent_fertility","gdp","life_expectancy","mortality_rate","net_migration","prem","pop_growth","pop_total","surface_area")
 
+# Convert factors to numeric
 as.numeric.factor <- function(x) {as.numeric(levels(x))[x]}
-
 world_stats_numerics <- lapply(world_stats[,c(3:dim(world_stats)[2])], as.numeric.factor)
 world_stats_numerics <- as.data.frame(world_stats_numerics)
 world_stats <- cbind(world_stats[,c(1,2)],world_stats_numerics)
 
-# world_stats$gdp <- as.numeric(levels(world_stats$gdp))[world_stats$gdp]
-# world_stats$gdp <- as.character.factor(world_stats$gdp)
-# world_stats$mortality_rate <- as.numeric(levels(world_stats$mortality_rate))[world_stats$mortality_rate]
-# world_stats$pop_total <- as.numeric(levels(world_stats$pop_total))[world_stats$pop_total]
-
-world_stats$gdp <- world_stats$gdp/(1000000000)
+# Change units of GDP
 world_stats$gdp <- world_stats$gdp/(1000000000)
 ```
 
 ## Add corruption index to data
 
 ```{r}
-# create corruption index lookup table
+# Create corruption index lookup table
 ci_df <- read.csv("cpi.csv", sep=";")
 ci_df <- ci_df[,-c(1,2,4,7)]
 ci_df <- ci_df[ci_df$time==2018,c(1,3)]
@@ -69,6 +67,7 @@ ci_df$Country.Name <- as.character(ci_df$Country.Name)
 ## Synchronize names between tables
 
 ```{r}
+# Get country names from world_stats df and corruption index df
 countries_ws <- levels(droplevels(world_stats$Country.Name))
 countries_ci <- ci_df$Country.Name
 
@@ -76,6 +75,7 @@ already_renamed = list()
 idx = 0
 '%ni%' <- Negate('%in%')
 
+# Loop through world_stats df and synchronize differing country names
 for(country in countries_ws) {
   j = agrep(country, countries_ci, ignore.case = FALSE, value = FALSE, max.distance = 0.1)
   if(length(j) == 1) {
@@ -85,6 +85,7 @@ for(country in countries_ws) {
   idx = idx + 1
 }
 
+# Loop through corruption_index df and synchronize differing country names
 for(i in 1:nrow(ci_df)) {
   if(ci_df$Country.Name[i] %ni% already_renamed) {
     j = agrep(ci_df$Country.Name[i], countries_ws, ignore.case = FALSE, value = FALSE, max.distance = 0.1)
@@ -95,12 +96,13 @@ for(i in 1:nrow(ci_df)) {
 }
 ```
 
-## Add categorical features
+## Join tables (economic and corruption data) and create categorical features
 
 ```{r message=FALSE, warning=FALSE}
+# Create joined table
 world_stats <- full_join(world_stats, ci_df, by = "Country.Name")
 
-# update world stats table with corruption level
+# Update world stats table with corruption level
 world_stats <- world_stats %>% mutate(ci_rating = case_when(
                                       cpi >= 120  ~ "very corrupt",
                                       cpi < 120 & cpi >= 70 ~ "corrupt",
@@ -113,10 +115,10 @@ world_stats <- world_stats %>% mutate(mortality_cat = case_when(
                                       mortality_rate > 15 & mortality_rate <= 30 ~ "medium",
                                       mortality_rate > 30 ~ "high"))
 
-# drop NAs
+# Drop NAs
 world_stats <- world_stats[which(!is.na(world_stats$gdp) & !is.na(world_stats$cpi) & !is.na(world_stats$mortality_cat)),]
 
-# create df for 2018
+# Create df for 2018
 world_stats_2018 = world_stats[world_stats$year==2018,]
 world_stats_2018$ci_rating <- factor(world_stats_2018$ci_rating, levels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt"))
 ```
@@ -125,7 +127,7 @@ world_stats_2018$ci_rating <- factor(world_stats_2018$ci_rating, levels = c("ver
 
 In the first visualization, mortality rate is plotted against corruption to get a sense of correlation between the two variables.
 
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(data = world_stats_2018)+
   geom_point(aes(x=cpi, y=mortality_rate)) + 
   scale_x_continuous(labels = scales::comma)
@@ -139,8 +141,7 @@ In the second visualiation:
 * Point size is increased for readability
 * The graph grid is removed and axes cleaned up
 
-
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating)), size = 3) +
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
@@ -152,17 +153,18 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 3) +
 The final visualization:
 
 * Adds title and subtitle
-* Adds X and Y axis titles
-* Adjusts size of x and y axis labels
+* Adds X and Y-axis titles
+* Adjusts size of X and Y-axis labels
 * Adds size dimension to points, indicating GDP of country
-* Adds country labels to points
+* Adds annotations of countries
 * Adds red color scheme indicating level of mortality (darker=higher mortality)
+* Lightened XY axes
 
-
-```{r}
+```{r echo=FALSE, message=FALSE, warning=FALSE}
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating), size = gdp)) +
-  scale_size("GDP", breaks=c(5000,10000,15000,20000), labels=c("$5t","$10t","$15t","$20t")) +    
+  scale_size("GDP", breaks=c(5000,10000,15000,20000), labels=c("$5t","$10t","$15t","$20t")) + 
+  scale_x_continuous(breaks=seq(0,190,25), limits=c(0,190)) +
   scale_colour_brewer(palette = "Reds", 
                       direction=1, 
                       name = "Corruption Ranking", 
@@ -170,30 +172,31 @@ p + geom_point(aes(colour = factor(ci_rating), size = gdp)) +
   geom_text_repel(
     data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","Portugal","Italy","India","Denmark","Russian Federation","Angola","Afghanistan")), 
     aes(label=Country.Name),
-    nudge_y      = 55,
-    direction    = "y",
-    angle        = 0,
-    segment.color = "grey50",
+    nudge_y = 55,
+    direction = "y",
+    angle = 0,
+    color = "brown4",
+    segment.color = "grey88",
     segment.size = .2,
-    segment.alpha = .5,
-    size = 3.5,
-    point.padding = 1,
-    arrow = arrow(length=unit(0.03,"npc"), type="closed"),
+    segment.alpha = .8,
+    size = 3,
+    point.padding = .25,
+    arrow = arrow(length=unit(0.025,"npc"), type="closed"),
     vjust = 0) +
   theme_bw() + theme(panel.border = element_blank(), 
                      panel.grid.major = element_blank(),
                       panel.grid.minor = element_blank(), 
-                     axis.line = element_line(colour = "black")) +
+                     axis.line = element_line(colour = "black", size=.05, linetype="solid")) +
   labs(title="Global Infant Mortality vs Corruption", 
-       subtitle = "Data collected from World Bank and Corruption Perception Index",
+       subtitle = "Data collected from World Bank and Corruption Perceptions Index",
        x ="Corruption Ranking", 
        y = "Infant mortality Rate (in 1000 live births)") + 
   theme(plot.title = element_text(size=18),
         plot.subtitle = element_text(size=10),
-        axis.text.x = element_text(size=11), 
-        axis.text.y = element_text(size=11), 
-        axis.title.x = element_text(size=10),
-        axis.title.y = element_text(size=10))
+        axis.text.x = element_text(size=9), 
+        axis.text.y = element_text(size=9), 
+        axis.title.x = element_text(size=8),
+        axis.title.y = element_text(size=8))
 ```
 
 
