@@ -40,9 +40,16 @@ world_stats <- world_stats[,-c(5,12:16)]
 # rename metrics
 colnames(world_stats)[c(2,3,4,5,6,7,8,9,10,11)] <- c("year","adolescent_fertility","gdp","life_expectancy","mortality_rate","net_migration","prem","pop_growth","pop_total","surface_area")
 
-# convert cols to numeric
-world_stats$gdp <- as.numeric(levels(world_stats$gdp))[world_stats$gdp]
+as.numeric.factor <- function(x) {as.numeric(levels(x))[x]}
+
+world_stats <- lapply(world_stats[,c(3:dim(world_stats)[2])], as.numeric.factor)
+world_stats <- as.data.frame(world_stats)
+
+
+# world_stats$gdp <- as.numeric(levels(world_stats$gdp))[world_stats$gdp]
+world_stats$gdp <- as.character.factor(world_stats$gdp)
 world_stats$mortality_rate <- as.numeric(levels(world_stats$mortality_rate))[world_stats$mortality_rate]
+world_stats$pop_total <- as.numeric(levels(world_stats$pop_total))[world_stats$pop_total]
 
 world_stats$gdp <- world_stats$gdp/(1000000000)
 ```
@@ -86,8 +93,6 @@ for(i in 1:nrow(ci_df)) {
   }
 }
 ```
-
-
 
 ## Add categorical features
 
@@ -139,7 +144,8 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
   scale_colour_brewer(palette = "RdYlGn", direction=-1, name = "Corruption Level", labels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt")) +
-  geom_point(colour = "grey100", size = 1.5) +
+  geom_point(aes(size = pop_total)) +
+  # geom_point(colour = "grey100", size = 1.5) +
   geom_text_repel(
     data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","France","Italy","India","Denmark","Russian Federation")), 
     aes(label=Country.Name),
@@ -155,9 +161,14 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
     vjust        = 0) +
   theme_bw() + theme(panel.border = element_blank(), panel.grid.major = element_blank(),
   panel.grid.minor = element_blank(), axis.line = element_line(colour = "black")) +
-  labs(title="Mortality Rate vs Corruption in Countries", subtitle = "Data collected from World Bank and Corruption Perception Index") +
-  labs(x ="Corruption Perception Index", y = "Mortality Rate (< 5 yrs)") + 
-  theme(plot.title = element_text(size=18))
+  labs(title="Infant Mortality Rate vs Corruption in Countries", subtitle = "Data collected from World Bank and Corruption Perception Index") +
+  labs(x ="Corruption Perception Index", y = "Infant mortality Rate (in 1000 live births)") + 
+  theme(plot.title = element_text(size=18),
+        plot.subtitle = element_text(size=10),
+        axis.text.x = element_text(size=11), 
+        axis.text.y = element_text(size=11), 
+        axis.title.x = element_text(size=10),
+        axis.title.y = element_text(size=10))
 ```
 
 
