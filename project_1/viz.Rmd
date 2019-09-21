@@ -145,14 +145,12 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 4) +
 p <- ggplot(data = world_stats_2018, aes(x=cpi, y=mortality_rate))
 p + geom_point(aes(colour = factor(ci_rating), size = gdp)) +
   scale_size("GDP", breaks=c(5000,10000,15000,20000), labels=c("$5t","$10t","$15t","$20t")) +    
-  scale_colour_brewer(palette = "RdYlGn", 
-                      direction=-1, 
+  scale_colour_brewer(palette = "Reds", 
+                      direction=1, 
                       name = "Corruption Level", 
-                      labels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt")) +
-  # geom_point(aes(size = pop_total)) +
-  # geom_point(colour = "grey100", size = 1.5) +
+                      labels = c("Very clean", "Clean", "Somewhat corrupt", "Corrupt", "Very corrupt")) +
   geom_text_repel(
-    data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","Portugal","Italy","India","Denmark","Russian Federation","Angola")), 
+    data = subset(world_stats_2018, Country.Name %in% c("United States of America","Canada","China","Brazil","Portugal","Italy","India","Denmark","Russian Federation","Angola","Afghanistan")), 
     aes(label=Country.Name),
     nudge_y      = 55,
     direction    = "y",
