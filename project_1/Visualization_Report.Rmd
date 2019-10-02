@@ -123,7 +123,7 @@ world_stats_2018 = world_stats[world_stats$year==2018,]
 world_stats_2018$ci_rating <- factor(world_stats_2018$ci_rating, levels = c("very clean", "clean", "somewhat corrupt", "corrupt", "very corrupt"))
 ```
 
-## Visualization 1
+## Draft: visualization 1
 
 In the first visualization, mortality rate is plotted against corruption to get a sense of correlation between the two variables.
 
@@ -133,7 +133,7 @@ ggplot(data = world_stats_2018)+
   scale_x_continuous(labels = scales::comma)
 ```
 
-## Visualization 2
+## Draft 2: visualization 2
 
 In the second visualiation:
 
@@ -148,7 +148,7 @@ p + geom_point(aes(colour = factor(ci_rating)), size = 3) +
   panel.grid.minor = element_blank(), axis.line = element_line(colour = "black"))
 ```
 
-## Visualization 3
+## Final: visualization 3
 
 The final visualization:
 

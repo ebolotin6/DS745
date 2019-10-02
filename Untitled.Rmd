@@ -1,0 +1,54 @@
+---
+title: "Untitled"
+author: "Eli (Ilya) Bolotin"
+date: "9/30/2019"
+output: pdf_document
+---
+
+```{r message=FALSE, warning=FALSE}
+library(statnet)
+library(devtools)
+library(UserNetR)
+data(Moreno)
+data(DHHS) 
+```
+
+```{r}
+network.size(DHHS)
+```
+
+```{r}
+gden(DHHS)
+```
+
+```{r}
+plot(DHHS)
+plot(Moreno)
+```
+
+```{r}
+Moreno1<-get.inducedSubgraph(Moreno,which(Moreno %v% "gender"=="1"))
+gden(Moreno1)
+```
+
+```{r}
+# summary(DHHS)
+"NIH-20" %in% get.vertex.attribute(DHHS, "vertex.names") 
+```
+
+
+```{r}
+netmat<-rbind(c("A","B"),
+              c("A","C"),
+              c("B","C"),
+              c("B","D"),
+              c("C","E"))
+netmatdf<-data.frame(netmat)
+netmatdf
+netmat.edge<-netmatdf
+netmat.graph<-network(netmat.edge,matrix.type="edgelist")
+summary(netmat.graph)
+gden(netmat.graph)
+gplot(netmat.graph,displaylabels=TRUE)
+```
+
