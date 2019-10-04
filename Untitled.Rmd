@@ -52,3 +52,19 @@ gden(netmat.graph)
 gplot(netmat.graph,displaylabels=TRUE)
 ```
 
+```{r message=FALSE, warning=FALSE}
+library(igraph)
+install.packages("intergraph")
+library(intergraph)
+data(Bali)
+```
+
+
+```{r}
+op<-par(mar=c(0,0,12,0),mfrow=c(1,2))
+deg<-degree(Bali, gmode="graph")
+plot(Bali,vertex.cex=deg,main="Raw")
+plot(Bali,vertex.cex=log(deg),main="Adjusted")
+par(op)
+```
+
