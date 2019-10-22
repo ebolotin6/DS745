@@ -1,0 +1,114 @@
+---
+title: "Project 2"
+author: "Eli (Ilya) Bolotin"
+date: "10/21/2019"
+output: word_document
+fontsize: 11
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Load libraries
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(statnet, devtools, UserNetR,igraphdata)
+# detach(package:igraph)
+```
+
+# Load data
+```{r}
+data(USairports)
+```
+
+# Convert igraph to statnet network
+```{r}
+df <- asDF(USairports) # this works
+net1 <- asNetwork(df$edges, vertices=df$vertexes)
+```
+
+# Analyze network
+```{r}
+# view vertex attributes
+list.vertex.attributes(net1)
+
+# view edge attributes
+list.edge.attributes(net1)
+
+# summary overall of network
+# summary(net1)
+
+# examine city vertex
+head(get.vertex.attribute(net1, "City"))
+
+# view density of network
+density.n1 <- gden(net1)
+```
+
+Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, the country consists of mostly regional airports that connect through nationally-central hubs for longer distance flights.
+
+# Add state vertex
+
+```{r}
+net1 %v% "state" <- as.character(sapply(strsplit(get.vertex.attribute(net1, "City"), ", ", fixed = TRUE), function(x) x[2]))
+```
+
+
+# Examine complete network
+
+```{r}
+set.seed(30)
+# net2 <- symmetrize(net1)
+gplot(net1, vertex.col = 2, displaylabels = FALSE)
+```
+
+The network is hard to intelligbly decipher due to 23k edges. But the pattern is clear: the network is divided into two primary communities that are connected by central nodes. 
+
+# Subgraph the network
+
+To get a better sense of the most central nodes, we create subgraphs based on 2 centrality measures: degree and betweenness. These measures are most relevant because they reflect the most connected nodes (degree) as well as how many sub-nodes are connected through the most connected nodes (betweenness).
+
+```{r}
+# add vertex attributes for each centrality measure
+net1 %v% "degree" <- degree(net1)
+net1 %v% "btw" <- betweenness(net1)
+
+# view summary of centrality attributes
+summary(get.vertex.attribute(net1, "degree"))
+summary(get.vertex.attribute(net1, "btw"))
+
+n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 100))
+n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
+```
+
+# plot subnetworks
+
+```{r}
+rescale <- function(nchar, low, high) {
+    min_d <- min(nchar)
+    max_d <- max(nchar)
+    rscl <- ((high - low) * (nchar - min_d)) / (max_d - min_d) + low
+    rscl
+  }
+```
+
+
+```{r}
+set.seed(30)
+op <- par(mar = c(0,0,4,0),mfrow=c(1,2)) 
+statelab = get.vertex.attribute(n1d, "state")
+deg <- degree(n1d)
+gplot(n1d, displaylabels = F, label = statelab, vertex.cex = rescale(deg,1,6), vertex.col = 2, edge.col = "grey80", edge.lwd = 0.5)
+gplot(n1b, vertex.col = 3, displaylabels = FALSE, mode="fruchtermanreingold")
+par(op)
+```
+
+
+# Visualization and Network Summary
+
+# Community Detection
+
+# Network modeling
+
+

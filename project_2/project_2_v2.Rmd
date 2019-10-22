@@ -13,13 +13,72 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 # Load libraries
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(statnet, devtools, UserNetR, igraph, intergraph, igraphdata, maps, geosphere, proj4)
-detach(package:statnet)
+pacman::p_load(statnet, devtools, UserNetR, igraph, intergraph, igraphdata)
+detach(package:igraph)
 ```
 
+# Load data
 ```{r}
 data(USairports)
 ```
+
+# Convert igraph to statnet network
+```{r}
+df <- asDF(USairports) # this works
+net1 <- asNetwork(df$edges, vertices=df$vertexes)
+```
+
+# Analyze network
+```{r}
+# view vertex attributes
+list.vertex.attributes(net1)
+
+# view edge attributes
+list.edge.attributes(net1)
+
+# summary overall of network
+summary(net1)
+
+# examine city vertex
+head(get.vertex.attribute(net1, "City"))
+
+# view density of network
+density.n1 <- gden(net1)
+
+# add vertex attribute to capture degree
+net1 %v% "alldeg" <- degree(net1)
+
+# view summary of degree
+summary(get.vertex.attribute(net1, "alldeg"))
+```
+
+Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, regional airports connect through central hubs for longer distance flights.
+
+
+# Examine complete network
+
+```{r}
+set.seed(30)
+gplot(net1, vertex.col = 2, displaylabels = FALSE)
+```
+
+The network is hard to intelligbly decipher due to 23k edges. But the pattern is clear: the network is divided into two primary communities that are connected by central nodes. 
+
+# Subgraph the network  
+
+To get a better sense of the most central nodes
+
+```{r}
+
+n1f <- get.inducedSubgraph(net1, which(net1 %v% "alldeg" >= 20))
+
+```
+
+```{r}
+set.seed(30)
+gplot(n1f, vertex.col = 2, displaylabels = FALSE)
+```
+
 
 # Visualization and Network Summary
 
@@ -42,44 +101,16 @@ edges <- E(USairports)
 # Add state as vertex attribute
 USairports <- set.vertex.attribute(USairports, "State", index=V(USairports), as.character(sapply(strsplit(V(USairports)$City, ", ", fixed = TRUE), function(x) x[2])))
 
-USairports <- set.vertex.attribute(USairports, "Lat", index=V(USairports), as.character(sapply(strsplit(V(USairports)$Position, " ", fixed = TRUE), function(x) x[1])))
-
-USairports <- set.vertex.attribute(USairports, "Long", index=V(USairports), as.character(sapply(strsplit(V(USairports)$Position, " ", fixed = TRUE), function(x) x[2])))
-
 # View vertex attributes after
 va <- vertex_attr(USairports)
 va_names <- names(va)
-```
-
-
-
-```{r}
-xy <- data.frame(matrix(c(V(USairports)$Long,V(USairports)$Lat), ncol=2))
-
-library(proj4)
-proj4string <- "+proj=utm +zone=19 +south +ellps=WGS84 +datum=WGS84 +units=m +no_defs "
-
-# Transformed data
-pj <- project(xy, proj4string, inverse=TRUE)
-latlon <- data.frame(lat=pj$y, lon=pj$x)
-print(latlon)
-```
-
-
-## map
-
-```{r}
-map("state", col="grey20", fill=TRUE, bg="black", lwd=0.1)
-
-# Add a point on the map for each airport:
-points(x=latlon$lat, y=latlon$lon, pch=19, cex=10, col="orange")
 ```
 
 ## initial plot
 ```{r}
 set.seed(10)
 USairports <- simplify(USairports, remove.multiple = T, remove.loops = T)
-plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.cex = .8, vertex.label.dist=2, edge.arrow.size = .2, layout=layout_with_fr(USairports), col=rgb(.25, .5, .3, alpha=.5))
+plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.cex = .8, vertex.label.dist=2, edge.arrow.size = .2, layout=layout_with_fr(USairports))
 ```
 
 ## filtering
@@ -134,11 +165,7 @@ plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.dist=1, edge.arrow
 # as_data_frame(net, what="vertices")
 ```
 
-```{r}
-# convert coordinates
-# df <- asDF(USairports) # this works
-# net1 <- asNetwork(df$edges, vertices=df$vertexes)
-```
+
 
 
 # Community Detection
