@@ -1,0 +1,96 @@
+---
+title: "Project 2"
+author: "Eli (Ilya) Bolotin"
+date: "10/21/2019"
+output: word_document
+fontsize: 11
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Load libraries
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(statnet, devtools, UserNetR, igraph, intergraph, igraphdata, dplyr)
+detach(package:statnet)
+```
+
+```{r}
+data(USairports)
+```
+
+# Visualization and Network Summary
+
+```{r}
+# view attribute names
+vertex_attr_names(USairports)
+edge_attr_names(USairports)
+
+# pull attributes
+va <- vertex_attr(USairports)
+ea <- edge_attr(USairports)
+
+# view edges and vertices of object
+vertices <- V(USairports)
+edges <- E(USairports)
+
+# vertices of object
+USairports <- delete_vertex_attr(USairports, "Position")
+
+# Add state as vertex attribute
+USairports <- set.vertex.attribute(USairports, "State", index=V(USairports), as.character(sapply(strsplit(V(USairports)$City, ", ", fixed = TRUE), function(x) x[2])))
+
+# View vertex attributes after
+va <- vertex_attr(USairports)
+va_names <- names(va)
+```
+
+```{r}
+'%ni%' <- Negate('%in%')
+# USairports <- simplify(USairports, remove.multiple = T, remove.loops = T)
+inCal <- grepl("CA$", V(USairports)$City) 
+inNy <- grepl("NY$", V(USairports)$City)
+# ny_ca <- E(USairports)[V(USairports)[inCal] %->% V(USairports)[inNy]]
+# new_graph <- graph_from_edgelist(ny_ca)
+subv = c(V(USairports)[inCal], V(USairports)[inNy])
+# calAirports <- induced_subgraph(USairports, inCal)
+# nyAirports <- induced_subgraph(USairports, inNy)
+bothAirports <- induced_subgraph(USairports, vids=subv)
+# bothAirports <- simplify(bothAirports, remove.multiple = T, remove.loops = T)
+# USairports <- delete_vertices(USairports, V(USairports)[c("CA","NY") != V(USairports)$State])
+```
+
+```{r}
+set.seed(10)
+bothAirports <- simplify(bothAirports, remove.multiple = T, remove.loops = T)
+l = layout_with_fr(bothAirports)
+plot(bothAirports, vertex.label=NA, vertex.color = vertex_attr(bothAirports)$State, vertex.size=5, vertex.label.cex = .8, vertex.label.dist=2, edge.arrow.size = .2, layout=l)
+```
+
+```{r}
+set.seed(4)
+# plot(g4s, vertex.label=V(USairports)$State, vertex.size=1, vertex.label.dist=1, edge.arrow.size = 0)
+plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.dist=1, edge.arrow.size = 0, layout=l)
+```
+
+```{r}
+# d2Vertices <- ego(USairports, nodes = c("JFK","LAX"), order=2)
+# JFKNet <- make_ego_graph(USairports, nodes = "JFK", order=2)[[1]]
+```
+
+
+```{r}
+# convert back for exporting
+# as_data_frame(net, what="edges")
+# as_data_frame(net, what="vertices")
+```
+
+
+
+# Community Detection
+
+# Network modeling
+
+
