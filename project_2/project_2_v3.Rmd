@@ -13,7 +13,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 # Load libraries
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph)
+pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph, network, sna, ggplot2)
 ```
 
 # Load data
@@ -81,11 +81,17 @@ net1 %v% "btw" <- betweenness(net1)
 summary(get.vertex.attribute(net1, "degree"))
 summary(get.vertex.attribute(net1, "btw"))
 
-n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 40))
-n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
+# n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 40))
+# n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
 
-# cities <- get.vertex.attribute(net1, "City")
-# top_20 <- cities[which(net1 %v% "degree" >= 300)]
+sorted_deg <- sort(get.vertex.attribute(net1, "degree"), index.return=TRUE)
+top_10 = rev(sorted_deg$ix)[1:10]
+cities <- get.vertex.attribute(net1, "City")
+states <- get.vertex.attribute(net1, "state")
+cities_t10 <- cities[top_10]
+states_t10 <- unique(states[top_10])
+
+sub1 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% states_t10))
 ```
 
 # plot subnetworks
@@ -100,38 +106,35 @@ rescale <- function(nchar, low, high) {
 ```
 
 ```{r}
+library(RColorBrewer)
+my_pal <- brewer.pal(9, "YlOrRd")
+```
+
+
+```{r}
 set.seed(30)
 
 op <- par(mar = c(0,0,4,0),mfrow=c(1,2))
-statelab1 = get.vertex.attribute(n1d, "state")
-statelab2 = get.vertex.attribute(n1b, "state")
+sublab = get.vertex.attribute(sub1, "name")
 
-gplot(n1d, displaylabels = T, 
-      label = statelab1, 
-      label.cex = 0.7, 
-      vertex.col = 2, 
-      edge.col = "grey50", 
-      edge.lwd = 0.05,
-      displayisolates = F,
-      usearrows = F)
+# gplot(sub1, displaylabels = T, 
+#       label = sublab, 
+#       label.cex = 0.7, 
+#       vertex.col = 2, 
+#       edge.col = "grey50", 
+#       edge.lwd = 0.05,
+#       mode="circle",
+#       displayisolates = F,
+#       usearrows = F)
 
-gplot(n1b, displaylabels = T, 
-      label = statelab2, 
-      label.cex = 0.7, 
-      vertex.col = 2, 
-      edge.col = "grey50", 
-      edge.lwd = 0.05,
-      displayisolates = F,
-      usearrows = F)
+ggnet2(sub1, mode="circle",
+      color="state",
+      size = "degree",
+      size.zero = F,
+      palette = "YlOrRd") + guides(size = FALSE)
+
 par(op)
 ```
-
-```{r}
-# delete.vertices(n1d, isolates(n1d))
-# deg <- degree(n1d)
-# gplot(n1d, displaylabels = F, label = statelab, vertex.cex = rescale(deg,1,6), vertex.col = 2, edge.col = "grey80", edge.lwd = 0.5)
-```
-
 
 # Visualization and Network Summary
 

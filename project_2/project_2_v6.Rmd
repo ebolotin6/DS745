@@ -1,0 +1,160 @@
+---
+title: "Project 2"
+author: "Eli (Ilya) Bolotin"
+date: "10/21/2019"
+output: word_document
+fontsize: 11
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+# Load libraries
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph, network, sna, ggplot2, ggnet2())
+```
+
+# Visualization and Network Summary
+
+## Load data and view summary
+```{r}
+data(USairports)
+summary(USairports)
+full_net <- USairports
+```
+
+Data contains 23.5k edges and 755 nodes. Furthermore, there are multiple edges and loops. For the purposes of visualization, it makes sense to simplify our network by eliminating multiple edges temporarily.
+
+## Simplify network and convert to statnet
+```{r}
+# simplify network
+net1 <- simplify(USairports)
+summary(net1)
+detach(package:igraph)
+
+# convert to statnet network
+df <- asDF(net1) # this works
+net1 <- asNetwork(df$edges, vertices=df$vertexes)
+```
+
+## Analyze network
+```{r}
+# summary overall of network
+# summary(net1)
+
+# view vertex attributes
+list.vertex.attributes(net1)
+
+# view edge attributes
+list.edge.attributes(net1)
+
+# examine city vertex
+head(get.vertex.attribute(net1, "City"))
+
+# view density of network
+density.n1 <- gden(net1)
+```
+
+Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, the country consists of mostly regional airports that connect through more central hubs for longer distance flights.
+
+## Add state and region vertex vertex
+
+To help visualize the network, it makes sense to map airports to states and regions.
+
+```{r}
+region_map <- read.csv("states.csv", header = T)
+net1 %v% "state" <- as.character(sapply(strsplit(get.vertex.attribute(net1, "City"), ", ", fixed = TRUE), function(x) x[2]))
+lookup_table <- join(region_map, data.frame("State.Code" = get.vertex.attribute(net1, "state")), "State.Code")
+net1 %v% "region" <- as.character(sapply(get.vertex.attribute(net1, "state"), function(x) as.character(lookup_table[match(x, as.character(lookup_table[,1])),2])))
+```
+
+## Examine complete network
+
+```{r}
+set.seed(30)
+net2 <- symmetrize(net1)
+gplot(net2, vertex.col = 2, displaylabels = FALSE)
+```
+
+The network is hard to intelligbly decipher due to 8.2k edges. Nonetheless, several communities are visible with obvious central nodes.
+
+## Calculate centrality
+
+To get a better sense of the most central nodes, we need to calculate two centrality measures: degree and betweenness. 
+
+```{r}
+# add vertex attributes for each centrality measure
+net1 %v% "degree" <- degree(net1)
+net1 %v% "btw" <- betweenness(net1)
+
+# view summary of centrality attributes
+summary(get.vertex.attribute(net1, "degree"))
+summary(get.vertex.attribute(net1, "btw"))
+```
+
+## Prepare sub-network for visualization
+
+Next we will create a sub-network of the top-10 most central nodes (by degree) in order to visualize our network.
+
+```{r}
+top_states <- function(n, net, centrality) {
+  sorted_deg <- sort(get.vertex.attribute(net, centrality), index.return=TRUE)
+  top_x = rev(sorted_deg$ix)[1:n]
+  cities <- get.vertex.attribute(net, "City")
+  states <- get.vertex.attribute(net, "state")
+  cities_tx <- cities[top_x]
+  states_tx <- unique(states[top_x])
+  return(states_tx)
+}
+
+top_10_deg <- top_states(10, net1, "degree")
+top_10_btw <- top_states(10, net1, "btw")
+sub1 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% top_10_deg))
+sub2 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% top_10_btw))
+```
+
+## Plot subnetworks
+
+
+```{r}
+set.seed(30)
+
+op <- par(mar = c(0,0,4,0),mfrow=c(1,2))
+
+ggnet2(sub1, mode="kamadakawai",
+      label.size = 2.1,
+      label.alpha = 0.75,
+      label = "name",
+      label.color = "white",
+      color="state",
+      size = "degree",
+      size.min = 2,
+      palette = "Set1") + 
+  guides(size = FALSE) +
+  theme(panel.background = element_rect(fill = "grey15"))
+
+ggnet2(sub2, mode="kamadakawai",
+      label.size = 2.1,
+      label.alpha = 0.75,
+      label = "name",
+      label.color = "white",
+      color="state",
+      size = "degree",
+      size.min = 2,
+      palette = "Set1") + 
+  guides(size = FALSE) +
+  theme(panel.background = element_rect(fill = "grey15"))
+  
+
+par(op)
+```
+
+
+
+# Community Detection
+
+# Network modeling
+
+
