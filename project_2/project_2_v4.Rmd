@@ -13,18 +13,18 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 # Load libraries
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps)
+pacman::p_load(statnet, devtools, UserNetR, igraphdata)
 # detach(package:igraph)
 ```
 
 # Load data
 ```{r}
-data(USairports)
+data(UKfaculty)
 ```
 
 # Convert igraph to statnet network
 ```{r}
-df <- asDF(USairports) # this works
+df <- asDF(UKfaculty) # this works
 net1 <- asNetwork(df$edges, vertices=df$vertexes)
 ```
 
@@ -40,27 +40,21 @@ list.edge.attributes(net1)
 # summary(net1)
 
 # examine city vertex
-head(get.vertex.attribute(net1, "City"))
+head(get.vertex.attribute(net1, "Group"))
 
 # view density of network
 density.n1 <- gden(net1)
+density.n1
 ```
 
 Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, the country consists of mostly regional airports that connect through nationally-central hubs for longer distance flights.
 
-# Add state vertex
-
-```{r}
-net1 %v% "state" <- as.character(sapply(strsplit(get.vertex.attribute(net1, "City"), ", ", fixed = TRUE), function(x) x[2]))
-```
-
-
 # Examine complete network
 
 ```{r}
-# set.seed(30)
-# net2 <- symmetrize(net1)
-# gplot(net1, vertex.col = 2, displaylabels = FALSE)
+set.seed(30)
+net2 <- symmetrize(net1)
+gplot(net1, vertex.col = 3, displaylabels = FALSE)
 ```
 
 The network is hard to intelligbly decipher due to 23k edges. But the pattern is clear: the network is divided into two primary communities that are connected by central nodes. 
@@ -78,11 +72,8 @@ net1 %v% "btw" <- betweenness(net1)
 summary(get.vertex.attribute(net1, "degree"))
 summary(get.vertex.attribute(net1, "btw"))
 
-# n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 300))
-# n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
-
-cities <- get.vertex.attribute(net1, "City")
-top_20 <- cities[which(net1 %v% "degree" >= 300)]
+n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 9))
+n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 20))
 ```
 
 # plot subnetworks
@@ -96,35 +87,52 @@ rescale <- function(nchar, low, high) {
   }
 ```
 
+```{r}
+library(RColorBrewer)
+my_pal <- brewer.pal(4, "Dark2")
+```
+
 
 ```{r}
-
 set.seed(30)
 
+# n1d_matrix <- symmetrize(n1d, rule="weak")
+# n1b_matrix <- symmetrize(n1b, rule="weak")
+# n1d_sym <- network(n1d_matrix, matrix.type="adjacency")
+# n1b_sym <- network(n1b_matrix, matrix.type="adjacency")
+
 op <- par(mar = c(0,0,4,0),mfrow=c(1,2))
-statelab = get.vertex.attribute(n1d, "state")
-# delete.vertices(n1d, isolates(n1d))
-# deg <- degree(n1d)
-# gplot(n1d, displaylabels = F, label = statelab, vertex.cex = rescale(deg,1,6), vertex.col = 2, edge.col = "grey80", edge.lwd = 0.5)
+group_n1d = get.vertex.attribute(n1d, "vertex.names")
+group_n1b = get.vertex.attribute(n1b, "vertex.names")
+
+rolecat_n1d <- as.factor(get.vertex.attribute(n1d, "Group"))
+rolecat_n1b <- as.factor(get.vertex.attribute(n1b, "Group"))
+
 gplot(n1d, displaylabels = T, 
-      label = statelab, 
+      label = group_n1d, 
       label.cex = 0.7, 
-      vertex.col = 2, 
-      edge.col = "grey50", 
-      edge.lwd = 0.05,
+      vertex.cex = 1, 
+      vertex.col = my_pal[rolecat_n1d], 
+      edge.col = "grey80", 
+      edge.lwd = 0.05, 
+      mode="fruchtermanreingold", 
       displayisolates = F,
-      usearrows = F)
+      usearrows=F)
 
 gplot(n1b, displaylabels = T, 
-      label = statelab, 
+      label = group_n1b, 
       label.cex = 0.7, 
-      vertex.col = 2, 
-      edge.col = "grey50", 
-      edge.lwd = 0.05,
+      vertex.cex = 1, 
+      vertex.col = my_pal[rolecat_n1b], 
+      edge.col = "grey80", 
+      edge.lwd = 0.05, 
+      mode="fruchtermanreingold", 
       displayisolates = F,
-      usearrows = F)
+      usearrows=F)
+
 par(op)
 ```
+
 
 # Visualization and Network Summary
 

@@ -146,3 +146,18 @@ plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.dist=1, edge.arrow
 # Network modeling
 
 
+```{r}
+net1 %v% 'lat' <- as.character(sapply(strsplit(get.vertex.attribute(net1, "Position"), " ", fixed = TRUE), function(x) x[1]))
+
+net1 %v% 'long' <- as.character(sapply(strsplit(get.vertex.attribute(net1, "Position"), " ", fixed = TRUE), function(x) x[2]))
+
+proj4string <- "+proj=utm +zone=19 +ellps=WGS84 +units=m +no_defs"
+
+xy = data.frame(matrix(c(get.vertex.attribute(net1, "lat"),get.vertex.attribute(net1, "long")), nc=2))
+colnames(xy) <- c("lat","long")
+
+# Transformed data
+pj <- project(xy, proj4string, inverse=TRUE)
+latlon <- data.frame(lat=pj$y, lon=pj$x)
+print(latlon)
+```
