@@ -13,18 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 # Load libraries
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps)
-# detach(package:igraph)
+pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph)
 ```
 
 # Load data
 ```{r}
 data(USairports)
+net1 <- simplify(USairports)
+detach(package:igraph)
 ```
 
 # Convert igraph to statnet network
 ```{r}
-df <- asDF(USairports) # this works
+# df <- asDF(USairports) # this works
+# net1 <- asNetwork(df$edges, vertices=df$vertexes)
+df <- asDF(net1) # this works
 net1 <- asNetwork(df$edges, vertices=df$vertexes)
 ```
 
@@ -58,9 +61,9 @@ net1 %v% "state" <- as.character(sapply(strsplit(get.vertex.attribute(net1, "Cit
 # Examine complete network
 
 ```{r}
-# set.seed(30)
-# net2 <- symmetrize(net1)
-# gplot(net1, vertex.col = 2, displaylabels = FALSE)
+set.seed(30)
+net2 <- symmetrize(net1)
+gplot(net2, vertex.col = 2, displaylabels = FALSE)
 ```
 
 The network is hard to intelligbly decipher due to 23k edges. But the pattern is clear: the network is divided into two primary communities that are connected by central nodes. 
@@ -78,11 +81,11 @@ net1 %v% "btw" <- betweenness(net1)
 summary(get.vertex.attribute(net1, "degree"))
 summary(get.vertex.attribute(net1, "btw"))
 
-# n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 300))
-# n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
+n1d <- get.inducedSubgraph(net1, which(net1 %v% "degree" >= 40))
+n1b <- get.inducedSubgraph(net1, which(net1 %v% "btw" >= 2000))
 
-cities <- get.vertex.attribute(net1, "City")
-top_20 <- cities[which(net1 %v% "degree" >= 300)]
+# cities <- get.vertex.attribute(net1, "City")
+# top_20 <- cities[which(net1 %v% "degree" >= 300)]
 ```
 
 # plot subnetworks
@@ -96,18 +99,15 @@ rescale <- function(nchar, low, high) {
   }
 ```
 
-
 ```{r}
-
 set.seed(30)
 
 op <- par(mar = c(0,0,4,0),mfrow=c(1,2))
-statelab = get.vertex.attribute(n1d, "state")
-# delete.vertices(n1d, isolates(n1d))
-# deg <- degree(n1d)
-# gplot(n1d, displaylabels = F, label = statelab, vertex.cex = rescale(deg,1,6), vertex.col = 2, edge.col = "grey80", edge.lwd = 0.5)
+statelab1 = get.vertex.attribute(n1d, "state")
+statelab2 = get.vertex.attribute(n1b, "state")
+
 gplot(n1d, displaylabels = T, 
-      label = statelab, 
+      label = statelab1, 
       label.cex = 0.7, 
       vertex.col = 2, 
       edge.col = "grey50", 
@@ -116,7 +116,7 @@ gplot(n1d, displaylabels = T,
       usearrows = F)
 
 gplot(n1b, displaylabels = T, 
-      label = statelab, 
+      label = statelab2, 
       label.cex = 0.7, 
       vertex.col = 2, 
       edge.col = "grey50", 
@@ -125,6 +125,13 @@ gplot(n1b, displaylabels = T,
       usearrows = F)
 par(op)
 ```
+
+```{r}
+# delete.vertices(n1d, isolates(n1d))
+# deg <- degree(n1d)
+# gplot(n1d, displaylabels = F, label = statelab, vertex.cex = rescale(deg,1,6), vertex.col = 2, edge.col = "grey80", edge.lwd = 0.5)
+```
+
 
 # Visualization and Network Summary
 
