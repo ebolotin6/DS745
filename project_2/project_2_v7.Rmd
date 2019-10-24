@@ -21,40 +21,30 @@ pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph, intergraph
 ## Load data and view summary
 ```{r}
 data(USairports)
-summary(USairports)
-full_net <- USairports
 ```
 
 The network contains 23.5k edges, 755 nodes, 3 vertex attributes and 5 edge attributes. Due to the fact there are multiple edges and loops, it makes sense to simplify our network by eliminating multiple edges for the purposes of visualization.
 
-## Simplify network and convert to statnet
+## Simplify network
 ```{r}
 # simplify network
-net1 <- simplify(full_net)
-summary(net1)
-detach(package:igraph)
-
-# convert to statnet network
-df <- asDF(net1)
-net1 <- asNetwork(df$edges, vertices=df$vertexes)
+net1 <- simplify(USairports)
 ```
 
 ## Analyze network
 ```{r}
 # summary overall of network
-# summary(net1)
+summary(net1)
 
-# view vertex attributes
-list.vertex.attributes(net1)
-
-# view edge attributes
-list.edge.attributes(net1)
+# view attribute names
+vertex_attr_names(net1)
+edge_attr_names(net1)
 
 # examine city vertex
-head(get.vertex.attribute(net1, "City"))
+head(V(net1)$City)
 
 # view density of network
-density.n1 <- gden(net1)
+density.n1 <- edge_density(net1)
 ```
 
 Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, the country consists of mostly regional airports that connect through more central hubs for longer distance flights.
@@ -63,22 +53,27 @@ Network density is `density.n1`. The closer to 1 the density is, "the more inter
 
 To help visualize the network, it makes sense to map airports to states and regions.
 
-```{r}
+```{r message=FALSE, warning=FALSE}
+# derive state from city
+net1 <- set.vertex.attribute(net1, "state", index=V(net1), as.character(sapply(strsplit(V(net1)$City, ", ", fixed = TRUE), function(x) x[2])))
+
+# define region map and lookup table
 region_map <- read.csv("states.csv", header = T)
-net1 %v% "state" <- as.character(sapply(strsplit(get.vertex.attribute(net1, "City"), ", ", fixed = TRUE), function(x) x[2]))
-lookup_table <- join(region_map, data.frame("State.Code" = get.vertex.attribute(net1, "state")), "State.Code")
-net1 %v% "region" <- as.character(sapply(get.vertex.attribute(net1, "state"), function(x) as.character(lookup_table[match(x, as.character(lookup_table[,1])),2])))
+lookup_table <- join(region_map, data.frame("State.Code" = V(net1)$state, "State.Code"))
+
+# get region from state
+net1 <- set.vertex.attribute(net1, "region", index=V(net1), as.character(sapply(V(net1)$state, function(x) as.character(lookup_table[match(x, as.character(lookup_table[,1])),2]))))
 ```
 
 ## Examine complete network
 
 ```{r}
 set.seed(30)
-net2 <- symmetrize(net1)
-gplot(net2, vertex.col = 2, displaylabels = FALSE)
+net1 <- as.undirected(net1)
+plot(net1, vertex.size = 1, vertex.label = NA, edge.arrow.size = 0)
 ```
 
-The network is hard to intelligbly decipher at 8.2k edges. Nonetheless, several communities are visible with obvious central nodes.
+The network is hard to intelligibly decipher at 8.2k edges. Nonetheless, several communities are visible with obvious central nodes.
 
 ## Calculate centrality
 
@@ -86,12 +81,12 @@ In order to produce a more meaningful visualization, we first need to get a bett
 
 ```{r}
 # add vertex attributes for each centrality measure
-net1 %v% "degree" <- degree(net1)
-net1 %v% "btw" <- betweenness(net1)
+net1 <- set.vertex.attribute(net1, "degree", index=V(net1), degree(net1))
+net1 <- set.vertex.attribute(net1, "btw", index=V(net1), betweenness(net1))
 
 # view summary of centrality attributes
-summary(get.vertex.attribute(net1, "degree"))
-summary(get.vertex.attribute(net1, "btw"))
+summary(V(net1)$degree)
+summary(V(net1)$btw)
 ```
 
 ## Prepare sub-network for visualization
@@ -102,18 +97,26 @@ Next we will create two sub-networks:
 * Sub-network 2: represents the states of the top-10 airports as sorted by betweenness
 
 ```{r}
+df <- asDF(net1)
+net2 <- asNetwork(df$edges, vertices=df$vertexes)
+```
+
+
+```{r}
 top_states <- function(n, net, centrality) {
-  sorted_deg <- sort(get.vertex.attribute(net, centrality), index.return=TRUE)
+  sorted_deg <- sort(vertex_attr(net, centrality), index.return=TRUE)
   top_x = rev(sorted_deg$ix)[1:n]
-  states <- get.vertex.attribute(net, "state")
+  states <- V(net)$state
   states_tx <- unique(states[top_x])
   return(states_tx)
 }
 
 top_10_deg <- top_states(10, net1, "degree")
 top_10_btw <- top_states(10, net1, "btw")
-sub1 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% top_10_deg))
-sub2 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% top_10_btw))
+top_10_deg %in% V(net1)$region
+
+sub1 <- induced_subgraph(net1, vids = V(net1)[V(net1)$state %in% top_10_deg])
+sub2 <- induced_subgraph(net1, vids = V(net1)[V(net1)$state %in% top_10_btw])
 ```
 
 ## Plot sub-networks
@@ -121,9 +124,14 @@ sub2 <- get.inducedSubgraph(net1, which(net1 %v% "state" %in% top_10_btw))
 ```{r message=FALSE, warning=FALSE}
 set.seed(30)
 
+sub1_df <- asDF(sub1)
+sub2_df <- asDF(sub2)
+sub1_converted <- asNetwork(sub1_df$edges, vertices=sub1_df$vertexes)
+sub2_converted <- asNetwork(sub2_df$edges, vertices=sub2_df$vertexes)
+
 op <- par(mar = c(0,0,1,0),mfrow=c(1,2))
 
-ggnet2(sub1, mode="kamadakawai",
+ggnet2(sub1_converted, mode="kamadakawai",
       label.size = 2.1,
       label.alpha = 0.75,
       label = "name",
@@ -137,7 +145,7 @@ ggnet2(sub1, mode="kamadakawai",
   theme(panel.background = element_rect(fill = "grey15")) +
   ggtitle("Airport Network", subtitle="Node size signifies degree centrality")
 
-ggnet2(sub2, mode="kamadakawai",
+ggnet2(sub2_converted, mode="kamadakawai",
       label.size = 2.1,
       label.alpha = 0.75,
       label = "name",
@@ -166,45 +174,38 @@ For example, in the first visualization - airports such as LAX, SFO, DEN, and LA
 
 ## Select sample of full network for plotting
 
-```{r message=FALSE, warning=FALSE}
-library(igraph)
-set.seed(30)
-total_airports <- length(V(full_net)$name)
-half_airports = round(total_airports/2)
-sample_airports <- sample(seq(1:total_airports),half_airports, replace = F)
-subnet <- induced_subgraph(full_net, vids=V(full_net)[sample_airports])
-subnet <- simplify(subnet)
-subnet <- as.undirected(subnet)
+```{r}
+sub3 <- induced_subgraph(net1, vids = V(net1)[V(net1)$region %in% c("West","South")])
 ```
 
 ## Algorithm testing and modularity
 
 ```{r}
-cw1 <- cluster_leading_eigen(subnet)
-cw2 <- cluster_fast_greedy(subnet)
-cw3 <- cluster_louvain(subnet)
+cw1 <- cluster_leading_eigen(sub3)
+cw2 <- cluster_fast_greedy(sub3)
+cw3 <- cluster_louvain(sub3)
 print(modularity(cw1))
 print(modularity(cw2))
 print(modularity(cw3))
 ```
 
-Out of the 3 community detection algorithms tested above, the one with the highest modularity is the third ("Louvain"). However, all 3 community detection algorithms post a similar modularity between 0.38 and nearly 0.40. This implies that they all detect considerable clustering with respect to node groupings in the network ^[1]^ (p.115, Network Analysis in R).
+Out of the 3 community detection algorithms tested above, the one with the highest modularity is the third ("Louvain"). However, all 3 community detection algorithms post a similar modularity between 0.52 and nearly 0.585. This implies that they all detect considerable clustering with respect to node groupings in the network ^[1]^ (p.115, Network Analysis in R).
 
 ## Plot communities
 
 ```{r}
 op <- par(mar = c(0,0,4,0),mfrow=c(1,3))
-plot(cw1, subnet,
+plot(cw1, sub3,
      vertex.label = NA,
      vertex.size=4,
      edge.arrow.size = 0)
 
-plot(cw2, subnet,
+plot(cw2, sub3,
      vertex.label = NA,
      vertex.size=4,
      edge.arrow.size = 0)
 
-plot(cw3, subnet,
+plot(cw3, sub3,
      vertex.label = NA,
      vertex.size=4,
      edge.arrow.size = 0)
@@ -214,9 +215,30 @@ par(op)
 
 ## View community membership
 ```{r}
+# review what are the major groups
+membership_table <- table(membership(cw2))
+total_members = sum(membership_table)
+first_four_groups = sum(membership_table[1:4])
+percent <- first_four_groups/total_members
+membership_table
 
+group_1_states <- unique(V(sub3)$state[which(membership(cw2) == 1)])
+group_2_states <- unique(V(sub3)$state[which(membership(cw2) == 2)])
+group_3_states <- unique(V(sub3)$state[which(membership(cw2) == 3)])
+group_4_states <- unique(V(sub3)$state[which(membership(cw2) == 4)])
+group_1_states
+group_2_states
+group_3_states
+group_4_states
 ```
 
+The community generated by the fast and greedy algorithm (cw2) does not have the highest modularity of the 3 algorithms, but its plot of community membership looks the most reasonable. It makes the (correct) distinction of identifying regional communities as well as major hubs, with "thin branches" of airports delineated as separate groups.
+
+In the membership table above, the first four groups make up `percent` of total members (all nodes) in the plot. Further analysis of the these 4 groups tells us the following:
+* Group 1 consists of mostly larger hub-airports in Alaska
+* Group 2 consists of mostly states classified as Southern
+* Group 3 consists of mostly states classified as Western
+* Group 4 consists of mostly larger regional-airports in Alaska
 
 # Network modeling
 

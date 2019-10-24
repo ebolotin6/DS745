@@ -109,8 +109,15 @@ va_names <- names(va)
 ## initial plot
 ```{r}
 set.seed(10)
+
 USairports <- simplify(USairports, remove.multiple = T, remove.loops = T)
-plot(USairports, vertex.label=NA, vertex.size=1, vertex.label.cex = .8, vertex.label.dist=2, edge.arrow.size = .2, layout=layout_with_fr(USairports))
+
+plot(USairports, vertex.label=NA,
+     vertex.size=1, 
+     vertex.label.cex = .8, 
+     vertex.label.dist=2, 
+     edge.arrow.size = .2, 
+     layout=layout_with_fr(USairports))
 ```
 
 ## filtering
@@ -141,9 +148,18 @@ vertex_attr(bothAirports)$color # checking the color vector
 ## both airports
 ```{r}
 set.seed(10)
+
 bothAirports <- simplify(bothAirports, remove.multiple = T, remove.loops = T)
+
 l = layout_with_fr(bothAirports)
-plot(bothAirports, vertex.label=NA, vertex.color = vertex_attr(bothAirports)$color, vertex.size=igraph::degree(bothAirports), vertex.label.cex = .8, vertex.label.dist=2, edge.arrow.size = .2, layout=l)
+
+plot(bothAirports, vertex.label=NA, 
+     vertex.color = vertex_attr(bothAirports)$color, 
+     vertex.size=igraph::degree(bothAirports), 
+     vertex.label.cex = .8, 
+     vertex.label.dist=2, 
+     edge.arrow.size = .2, 
+     layout=l)
 ```
 
 ## all airports
