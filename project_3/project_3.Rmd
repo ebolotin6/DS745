@@ -1,0 +1,125 @@
+---
+title: "project_3"
+author: "Eli (Ilya) Bolotin"
+date: "11/14/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r message=FALSE, warning=FALSE}
+if (!require("pacman")) install.packages("pacman")
+pacman::p_load(keras)
+```
+
+## Dataset description
+
+## Problem description/ Objective of the project
+
+## Visually describe your textual data and findings
+
+## Variables: identify relevant variables that are being usde in the analysis
+
+## Methodology: steps detailing how the analysis was carried out
+
+### Read in articles data and compute number of articles
+
+```{r}
+# read in articles
+articles <- read.csv("nyt-comments/ArticlesApril2017.csv", header = T)
+articles <- articles[,c("articleID","headline")]
+
+# num unique articles
+num_articles <- length(articles$articleID)
+num_articles
+```
+
+### Read in comments data and select comment text and label
+
+```{r}
+comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
+comments <- comments[,c("commentBody","newDesk")]
+```
+
+### Get a count of classes (news desk) and preview comments and classes
+
+```{r}
+# preview comments
+head(comments)
+
+# count unique classes
+unique_classes <- length(unique(comments$newDesk))
+unique_classes
+```
+
+
+
+## Examimine data
+
+```{r}
+dim(comments)
+```
+
+For the month of April there were over 243,832 comments for `num_articles` articles
+
+### Tokenize text
+
+```{r}
+comment_text <- comments$commentBody
+tokenizer <- text_tokenizer() %>% fit_text_tokenizer(comment_text)
+```
+
+### Examine comment features/words and their indices
+
+```{r}
+# num words/indices
+length(tokenizer$word_index)
+
+# view word indices
+head(tokenizer$word_index)
+tail(tokenizer$word_index)
+```
+
+### Create representation of features/words for every comment
+
+One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Therefore, we can use *embeddings* to offer a compact representation of features/words.
+
+```{r}
+## binary mode
+ct_seq <- texts_to_sequences(tokenizer, comment_text)
+
+## view embeddings
+head(ct_seq)
+```
+
+### Pad tokenized embeddings
+
+Due to the fact that every comment is of variable length as evidenced above, we need to standardize each tokenized sequence before feeding it to our neural network, which expects a fixed size input. To do this, we need to do 2 things:
+
+* Set a max length of 21 elements (words) per comment
+* For sequences with less than 21 elements, pad these vectors with 0s.
+
+```{r}
+# Pad sequences
+ct_seq_padded <- pad_sequences(ct_seq, maxlen = 21, padding = "post")
+
+# View padded
+head(ct_seq_padded)
+```
+
+### Create keras model
+
+```{r}
+model <- keras_model_sequential()
+```
+
+```{r}
+model %>% 
+  layer_embedding(input_dim = 21, output_dim = 4) 
+```
+
+## Findings along with the discussion
+
+## References (last page)

@@ -4,6 +4,7 @@ author: "Eli (Ilya) Bolotin"
 date: "10/21/2019"
 output: word_document
 fontsize: 11
+geometry: margin=1.5cm
 ---
 
 ```{r setup, include=FALSE}
@@ -18,55 +19,54 @@ pacman::p_load(statnet, devtools, UserNetR, igraphdata, maps, igraph, intergraph
 
 # Visualization and Network Summary
 
-## Load data and view summary
+### Load data and view summary
 ```{r}
 data(USairports)
 full_net <- USairports
 ```
 
-The network contains 23.5k edges, 755 nodes, 3 vertex attributes and 5 edge attributes. Due to the fact there are multiple edges and loops, it makes sense to simplify our network by eliminating multiple edges for the purposes of visualization.
+The network contains 23.5k edges, 755 nodes, 3 vertex attributes and 5 edge attributes. Due to the fact there are multiple edges and loops, it makes sense to simplify our network by eliminating multiple edges and loops for the purposes of visualization.
 
-## Simplify network
+### Simplify network
 ```{r}
-# simplify network
 net1 <- simplify(USairports)
 ```
 
-## Analyze network
+### Analyze network
 ```{r}
-# summary overall of network
+# Summary overall of network
 summary(net1)
 
-# view attribute names
+# View attribute names
 vertex_attr_names(net1)
 edge_attr_names(net1)
 
-# examine city vertex
+# Examine city vertex
 head(V(net1)$City)
 
-# view density of network
+# View density of network
 density.n1 <- edge_density(net1)
 ```
 
 Network density is `density.n1`. The closer to 1 the density is, "the more interconnected the network" [1] (p.14, class text). In the context of this data, density is small because of the hub-and-spoke nature of the airline industry. That is, the country consists of mostly regional airports that connect through more central hubs for longer distance flights.
 
-## Add state and region vertex vertex
+### Add state and region vertex vertex
 
 To help visualize the network, it makes sense to map airports to states and regions.
 
 ```{r message=FALSE, warning=FALSE}
-# derive state from city
+# Derive state from city
 net1 <- set.vertex.attribute(net1, "state", index=V(net1), as.character(sapply(strsplit(V(net1)$City, ", ", fixed = TRUE), function(x) x[2])))
 
-# define region map and lookup table
+# Define region map and lookup table
 region_map <- read.csv("states.csv", header = T)
 lookup_table <- join(region_map, data.frame("State.Code" = V(net1)$state, "State.Code"))
 
-# get region from state
+# Get region from state
 net1 <- set.vertex.attribute(net1, "region", index=V(net1), as.character(sapply(V(net1)$state, function(x) as.character(lookup_table[match(x, as.character(lookup_table[,1])),2]))))
 ```
 
-## Examine complete network
+### Examine complete network
 
 ```{r}
 set.seed(30)
@@ -76,21 +76,21 @@ plot(net1, vertex.size = 1, vertex.label = NA, edge.arrow.size = 0)
 
 The network is hard to intelligibly decipher at 8.2k edges. Nonetheless, several communities are visible with obvious central nodes.
 
-## Calculate centrality
+### Calculate centrality
 
 In order to produce a more meaningful visualization, we first need to get a better sense of the most central nodes, i.e., we need to calculate centrality measures: degree and betweenness. 
 
 ```{r}
-# add vertex attributes for each centrality measure
+# Add vertex attributes for each centrality measure
 net1 <- set.vertex.attribute(net1, "degree", index=V(net1), degree(net1))
 net1 <- set.vertex.attribute(net1, "btw", index=V(net1), betweenness(net1))
 
-# view summary of centrality attributes
+# View summary of centrality attributes
 summary(V(net1)$degree)
 summary(V(net1)$btw)
 ```
 
-## Prepare sub-network for visualization
+### Prepare sub-network for visualization
 
 Next we will create two sub-networks:
 
@@ -109,22 +109,26 @@ top_states <- function(n, net, centrality) {
 top_10_deg <- top_states(10, net1, "degree")
 top_10_btw <- top_states(10, net1, "btw")
 
+# Sub-networks 1 and 2
 sub1 <- induced_subgraph(net1, vids = V(net1)[V(net1)$state %in% top_10_deg])
 sub2 <- induced_subgraph(net1, vids = V(net1)[V(net1)$state %in% top_10_btw])
 ```
 
-## Plot sub-networks
+### Plot sub-networks
 
 ```{r message=FALSE, warning=FALSE}
 set.seed(30)
 
+# Convert subnetworks to statnet
 sub1_df <- asDF(sub1)
 sub2_df <- asDF(sub2)
-sub1_converted <- asNetwork(sub1_df$edges, vertices=sub1_df$vertexes)
-sub2_converted <- asNetwork(sub2_df$edges, vertices=sub2_df$vertexes)
+
+sub1_converted <- asNetwork(sub1_df$edges, vertices=sub1_df$vertexes, directed=F)
+sub2_converted <- asNetwork(sub2_df$edges, vertices=sub2_df$vertexes, directed=F)
 
 op <- par(mar = c(0,0,1,0),mfrow=c(1,2))
 
+# plot sub1
 ggnet2(sub1_converted, mode="kamadakawai",
       label.size = 2.1,
       label.alpha = 0.75,
@@ -139,6 +143,7 @@ ggnet2(sub1_converted, mode="kamadakawai",
   theme(panel.background = element_rect(fill = "grey15")) +
   ggtitle("Airport Network", subtitle="Node size signifies degree centrality")
 
+# plot sub2
 ggnet2(sub2_converted, mode="kamadakawai",
       label.size = 2.1,
       label.alpha = 0.75,
@@ -166,14 +171,14 @@ For example, in the first visualization - airports such as LAX, SFO, DEN, and LA
 
 # Community Detection
 
-## Select sample of full network for plotting
+### Select sample of full network for plotting
 
 ```{r}
 sub3 <- induced_subgraph(net1, vids = V(net1)[V(net1)$region %in% c("West","South")])
 sub3 <- induced_subgraph(sub3, vids = V(sub3)[names(which(degree(sub3) > 1))])
 ```
 
-## Algorithm testing and modularity
+### Algorithm testing and modularity
 
 ```{r}
 cw1 <- cluster_leading_eigen(sub3)
@@ -186,7 +191,7 @@ print(modularity(cw3))
 
 Out of the 3 community detection algorithms tested above, the one with the highest modularity is the third ("Louvain"). However, all 3 community detection algorithms post a similar modularity between 0.52 and nearly 0.585. This implies that they all detect considerable clustering with respect to node groupings in the network ^[1]^ (p.115, Network Analysis in R).
 
-## Plot communities
+### Plot communities
 
 ```{r}
 op <- par(mar = c(0,0,4,0),mfrow=c(1,3))
@@ -210,7 +215,7 @@ par(op)
 
 ## View community membership
 ```{r}
-# review what are the major groups
+# Review what are the major groups
 membership_table <- table(membership(cw3))
 total_members = sum(membership_table)
 first_four_groups = sum(membership_table[1:6])
@@ -227,19 +232,21 @@ group_4_states
 group_8_states
 ```
 
-The community generated by the Louvain algorithm looks like it has the cleanest delineation of groups/communities. In the membership table above, the first six groups make up `percent` of total members (all nodes) in the plot. Further analysis of the largest groups reveals:
+The community generated by the Louvain algorithm has the cleanest delineation of communities. In the membership table above, the first six groups make up `percent` of total members (all nodes) in the plot. Further analysis of the largest groups reveals:
+
 * Groups colored in yellow, green, and light orange at the top of the network are airports in Alaska
 * Groups colored in blue, light blue, purple, and red at the bottom of the network pertain to airports in the western and southern USA and their regional connections.
 
 In terms of the membership table:
-* Group 1 consists of mostly states classified as Southern
-* Group 3 consists of mostly larger hub-airports in Alaska
-* Group 4 consists of mostly larger regional-airports in Alaska
-* Group 8 consists of mostly states classified as Western
+
+* Group 1 consists mostly of states classified as Southern
+* Group 3 consists mostly of larger hub-airports in Alaska
+* Group 4 consists mostly of larger regional-airports in Alaska
+* Group 8 consists mostly of states classified as Western
 
 # Network modeling
 
-## Convert network from igraph to statnet
+### Convert network from igraph to statnet
 
 ```{r message=FALSE, warning=FALSE}
 detach(package:igraph)
@@ -247,7 +254,7 @@ df <- asDF(net1)
 net1_conv <- asNetwork(df$edges, vertices=df$vertexes, directed = F)
 ```
 
-## Null model
+### Null model
 
 ```{r message=FALSE, warning=FALSE}
 library(ergm)
@@ -255,15 +262,15 @@ null_model <- ergm(net1_conv ~ edges, control=control.ergm(seed=40))
 summary(null_model)
 ```
 
-Null model produces an AIC of 47.2k. A negative coefficient of edges indicates that network density is less than 50%.
+The null model produces an AIC of 47.2k. The negative coefficient of edges (-4.104) indicates that network density is less than 50%, which we saw above in the analysis in section 1 of this document.
 
-## Linkage hypothesis
+### Linkage hypothesis
 
-**Null hypothesis**: Vertex attributes **do not** influence node connectivity/linkage for the population of US airports.
+**Null hypothesis**: Vertex attributes **do not** influence node connectivity/linkage at the population level of US airports.
 
-**Alternate hypothesis** : Vertex attributes **do** influence node connectivity/linkage for the population of US airports.
+**Alternate hypothesis** : Vertex attributes **do** influence node connectivity/linkage at the population level of US airports.
 
-## Test model
+### Test model
 
 ```{r message=FALSE, warning=FALSE}
 test_model <- ergm(net1_conv ~ edges +
@@ -273,9 +280,9 @@ test_model <- ergm(net1_conv ~ edges +
 summary(test_model)
 ```
 
-**Conclusion: ** At the 0.05 significance level, the node attributes of airport state (P = <1e-04) and degree (P = <1e-04) do significantly influence linkage at the population level of all US airports.
+**Conclusion: ** At the 0.05 significance level, the node attributes of airport state (P = <1e-04) and degree (P = <1e-04) **do** significantly influence linkage at the population level of all US airports.
 
-## Goodness of fit
+### Goodness of fit
 
 ```{r}
 test.model.fit <- gof(test_model, GOF = ~ distance + espartners + degree + triadcensus)
@@ -286,9 +293,9 @@ plot(test.model.fit, cex.axis=1.6, cex.label=1.6)
 par(op)
 ```
 
-The degree terms have been modeled well. However, the dyad-wise partners have not been modeled well - so there is more to be desired from this model.
+The degree terms have been modeled well because they follow the plotted confidence intervals. However, the dyad-wise partners have not been modeled well - so there is more to be desired from this model.
 
-## Simulation
+### Simulation
 
 ```{r message=FALSE, warning=FALSE}
 nullsim <- simulate(null_model, verbose = TRUE,seed = 5)
@@ -300,9 +307,9 @@ rownames(rowgof) <- c("Original net", "Null model", "Test model")
 rowgof
 ```
 
-The test model is ~9,000 triangles less than the original/true network. It also has less degrees. But it is much better than the null model.
+The test model is ~9,000 triangles less than the original/true network. It also has less degrees. However - it is much better than the null model.
 
-## Plot actual network vs simulated network
+### Plot actual network vs simulated network
 
 ```{r}
 op <- par(mfrow=c(1,2), mar=c(0,0,2,0))
@@ -320,4 +327,11 @@ plot(mainsim,usearrows=FALSE,
 par(op)
 ```
 
+The plotted simulation reveals that the test model does not fully predict the multitude of regional airports that are connected to Anchorange International in Alaska. This further means that the test model does not predict the full depth of the US airports network. But it does predict most of the central nodes.
+
+### Write to CSV
+
+```{r}
+write_graph(net1, "edges.csv", format="ncol")
+```
 
