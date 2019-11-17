@@ -11,21 +11,20 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(keras, ggplot2, dplyr)
+pacman::p_load(keras, ggplot2, dplyr, tidytext)
 ```
 
 ## Dataset description
 
-The dataset that I have chosen to use for this analysis is from the New York Times. More specifically, this open-source dataset contains NYT articles and reader comments from January to May 2017 and January to April 2018. 
-As mentioned in the official dataset description [1], the comments' data contains "over 2 million comments and 34 features", while the articles' data contains more than 9000 articles 16 features.
+The dataset that I have chosen to use for this is analysis/project is New York Times comments data [1]. This open-source dataset contains NYT articles and (reader) comments from January to May 2017 and January to April 2018. As mentioned in the linked dataset description, the comments' data contains "over 2 million comments and 34 features", while the articles' data contains more than 9000 articles 16 features.
 
 ## Objective
 
-The objective of this project is to analyze the comments of NYT readers with the goal of classifying comments into distinct article topics. Article topics are defined by editors of the NYT in column entitled "newDesk", as we will review below.
+The objective of this project is to analyze the comments of NYT readers with the goal of classifying comments into distinct article topics. Article topics are defined by editors of the NYT in column entitled "newDesk" that we will review below.
 
 ## Methodology: steps detailing how the analysis was carried out
 
-The methodology used in this project to perform text classification is a form of supervised learning. Namely, we will be training a neural network (multiple layer perceptron) on the comments data to predict article topic.
+The methodology used in this project to perform **text classification** is a form of **supervised learning**. Namely, a neural network (multiple layer perceptron) is trained on *comments data* to predict *article topic*.
 
 ## Text visualization and variable identification
 
@@ -45,7 +44,7 @@ num_articles <- length(articles$articleID)
 num_topics <- length(unique(articles$newDesk))
 ```
 
-For the month of April 2017, there were `num_articles` published by the NYT (each with distinct headlines). Examples of headlines include:
+For the month of April 2017, there were `num_articles` published by the NYT (each with distinct headlines). **Examples** of headlines include:
 
 ```{r}
 head(articles)
@@ -75,10 +74,10 @@ We will be training a neural network to predict the topics above based on user c
 
 ### Read in comments data and select comment text and label
 
-```{r echo=TRUE}
+```{r}
 # read in data
 comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
-comments <- as.data.frame(comments[,c("commentBody","newDesk")])
+comments <- as_tibble(comments[,c("commentBody","newDesk")])
 
 # examine dataset size
 dim_comments <- dim(comments)
@@ -93,7 +92,7 @@ Below is a small sample of user comments and their respective topics (classes.)
 
 ```{r echo=TRUE}
 # preview comments
-head(as_tibble(comments))
+head(comments)
 
 # count unique classes
 num_classes <- length(unique(comments$newDesk))
@@ -121,31 +120,45 @@ y_test <- comments$newDesk[test_indices]
 rm(comments)
 ```
 
-### Tokenize text
+### Analyze text
 
-Next, create a tokenizer that will map words to numbers.
+The comments/text need to be converted into machine readable form (numeric form) before we can work with them. Let's first analyze how many unique words we have in our dataset.
 
 ```{r}
-vocab_size = 30000
+comment_id <- tibble(idx = length(x_train), text = as.character(x_train))
+tokenized_tibble <- comment_id %>% 
+  unnest_tokens(word, text)
+num_unique_words <- length(unique(tokenized_tibble$word))
+```
+
+There are `num_unique_words` unique words in our corpus.
+
+### Tokenize text
+
+Create a tokenizer that will map words to numbers for every comment, up to a maximum of unique words. 
+
+```{r}
+vocab_len = num_unique_words
 # create a tokenizer that maps words to numbers for every comment
-tokenizer <- text_tokenizer(num_words = vocab_size) %>% fit_text_tokenizer(x_train)
+tokenizer <- text_tokenizer(num_words = vocab_len) %>% fit_text_tokenizer(x_train)
+len_tokens <- length(tokenizer$word_index)
 ```
 
 ### Examine tokenized data
 
 ```{r}
 # Get total number of unique words from tokenizer
-vocab_len <- length(tokenizer$word_index)
-vocab_len
+# vocab_len <- length(tokenizer$word_index)
+# vocab_len
 
 # View first/last word indices
 head(tokenizer$word_index)
 tail(tokenizer$word_index)
 ```
 
-### Vectorize words
+### Create binary vectors of words
 
-One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Instead, we can use an embedded layer in a neural network to represent the significance of word/sequences in the form of predetermined weights.
+One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Instead, with neural networks we can use an embedded layer to calculate a fixed number of weights/coefficients that will represent word-sequences in more compact form.
 
 To do this, we need to vectorize every comment according to the tokenized word indices created above.
 
@@ -155,25 +168,24 @@ train_vectors <- texts_to_sequences(tokenizer, x_train)
 test_vectors <- texts_to_sequences(tokenizer, x_test)
 
 # view embeddings
-head(train_vectors)
+head(train_vectors, 1)
 ```
 
 ### Pad tokenized sequences
 
-Due to the fact that every sequence (comment) is of variable length, we need to standardize each sequence input before it can be fed to the neural network (which expects a fixed size input). This step involves:
+Due to the fact that every word-sequence (comment) is of variable length, each sequence should be standardized to a fixed length before it can be fed to the neural network (which expects every input to have a equal/fixed size).
 
-* Determine the average length of comments
-* Set a max sequence length, called the input_size
-* For sequences less than max input size, pad these vectors with 0s.
+**First**: Analyze the length of comments
 
 ```{r}
 train_vector_lengths <- sapply(train_vectors, length)
 hist(train_vector_lengths, main = "Train Vector Lengths Distribution")
 quantiles = quantile(train_vector_lengths, probs = c(0.05, .95))
-quantiles
 ```
 
 As we can see above, the histogram contains a highly left-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is equal to `quantiles[2]` words per comment. So we can use this length as the input_size.
+
+**Next**: Set a max sequence length to `quantiles[2]` words and pad vectors less than this with 0.
 
 ```{r}
 # set input dimensions
@@ -183,11 +195,11 @@ vector_len = quantiles[2]
 x_train <- pad_sequences(train_vectors, maxlen = vector_len, padding = "post")
 x_test <- pad_sequences(test_vectors, maxlen = vector_len, padding = "post")
 
-# View padded sequences
-head(x_train)
+# View padded sequences (1 sequence shown)
+head(x_train, 1)
 ```
 
-### Create binary matrix from y_train
+### Create binary matrix of target variables for train/test sets
 
 ```{r}
 y_train <- as.factor(y_train)
@@ -199,20 +211,17 @@ y_test_numeric <- as.numeric(y_test)-1
 y_test_bin <- to_categorical(y_test_numeric, num_classes)
 ```
 
-
 ### Create Keras model
 
-* Below, created embedding layer to represent vectorized words in compact form
-* Arbitrarily chose to represent each vector in 50 dimensions (10 neurons)
-* Create neural network layers
+Below is the neural network architecture. We are using a sequential model with 4 fully connected layers, 1 pooling layer, and 2 dropout layers. Notice the use of the embedding layer to represent vectorized words in compact form (input dim = `vocab_len` and output = 100).
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 # create model
 model <- keras_model_sequential()
 
 # define layers
 model %>%
-  layer_embedding(input_dim = vocab_len, output_dim = 100) %>%
+  layer_embedding(input_dim = len_tokens-1, output_dim = 100) %>%
   layer_global_average_pooling_1d() %>%  
   layer_dense(units = 50, activation = "relu") %>%
   layer_dropout(rate = 0.10) %>% 
@@ -258,14 +267,14 @@ early_stopping <- callback_early_stopping(patience = 2)
 # train model
 history <- model %>% fit(
   x_train, y_train_bin, 
-  epochs = 10, 
+  epochs = 1, 
   batch_size = 128, 
   validation_split = 0.05,
   verbose = 1,
   callbacks = list(cp_callback, early_stopping)  # pass callback to training
 )
 
-model %>% save_model_hdf5("nyt_txt_class.h5")
+# model %>% save_model_hdf5("nyt_txt_class.h5")
 ```
 
 
