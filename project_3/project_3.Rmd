@@ -16,13 +16,18 @@ pacman::p_load(keras, ggplot2)
 
 ## Dataset description
 
-## Problem description/ Objective of the project
+The dataset that I have chosen to use for this analysis is from the New York Times. More specifically, this open-source dataset contains NYT articles and reader comments from January to May 2017 and January to April 2018. 
+As mentioned in the official dataset description [1], the comments' data contains "over 2 million comments and 34 features", while the articles' data contains more than 9000 articles 16 features.
 
-## Visually describe your textual data and findings
+## Objective
 
-## Variables: identify relevant variables that are being usde in the analysis
+The objective of this project is to analyze the comments of NYT readers with the goal of classifying comments into distinct article topics. Article topics are defined by editors of the NYT in column entitled "newDesk", as we will review below.
 
 ## Methodology: steps detailing how the analysis was carried out
+
+The methodology used in this project to perform text classification is a form of supervised learning. Namely, we will be training a neural network (multiple layer perceptron) on the comments data to predict article topic.
+
+## Text visualization and variable identification
 
 ### Read in articles data and compute number of articles
 
@@ -154,6 +159,10 @@ head(x_train)
 y_train <- as.factor(y_train)
 y_train_numeric <- as.numeric(y_train)-1
 y_train_bin <- to_categorical(y_train_numeric, num_classes)
+
+y_test <- as.factor(y_test)
+y_test_numeric <- as.numeric(y_test)-1
+y_test_bin <- to_categorical(y_test_numeric, num_classes)
 ```
 
 
@@ -236,7 +245,7 @@ plot(history)
 ### Evaluate model performance
 
 ```{r}
-model %>% evaluate(x_test, y_test,verbose = 0)
+model %>% evaluate(x_test, y_test_bin, verbose = 0)
 ```
 
 
@@ -246,7 +255,8 @@ model %>% evaluate(x_test, y_test,verbose = 0)
 model %>% predict_classes(x_test)
 ```
 
-
 ## Findings along with the discussion
 
 ## References (last page)
+
+[1] https://www.kaggle.com/aashita/nyt-comments
