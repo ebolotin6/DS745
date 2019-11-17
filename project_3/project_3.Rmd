@@ -9,9 +9,9 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(keras)
+pacman::p_load(keras, ggplot2)
 ```
 
 ## Dataset description
@@ -44,13 +44,10 @@ comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
 comments <- comments[,c("commentBody","newDesk")]
 
 # examine dataset size
-dim(comments)
-
-# define x and y vars
-comment_text <- comments$commentBody
-comments_classes <- comments$newDesk
+dim_comments <- dim(comments)
+total_comments <- dim_comments[1]
+total_comments
 ```
-
 
 ### Get a count of classes (news desk) and preview comments and classes
 
@@ -59,65 +56,93 @@ comments_classes <- comments$newDesk
 head(comments$commentBody)
 
 # count unique classes
-num_classes <- length(unique(comments_classes))
+num_classes <- length(unique(comments$newDesk))
 num_classes
 ```
 
 For the month of April there were over 243,832 comments for `num_articles` articles
 
-### Tokenize text
-
-Before running supervised learning on our data - we need to translate text into numeric data so that it can be machine-readable.
+### Split comments into train and test sets
 
 ```{r}
-# attribute numbers to words for every comment
-tokenizer <- text_tokenizer() %>% fit_text_tokenizer(comment_text)
+set.seed(30)
+num_train_samples <- round(total_comments * 0.80)
+train_indices <- sample(1:total_comments, num_train_samples, replace = FALSE)
+test_indices <- setdiff(1:num_train_samples, train_indices)
+```
+
+```{r}
+# define x and y vars
+x_train <- comments$commentBody[train_indices]
+y_train <- comments$newDesk[train_indices]
+x_test <- comments$commentBody[test_indices]
+y_test <- comments$newDesk[test_indices]
 
 # detach original data to clear memory
 rm(comments)
 ```
 
-### Examine comment features/words and their indices
+### Tokenize text
+
+Next, we need to create a tokenizer that will map words to numbers.
 
 ```{r}
-# count total number of unique words
+# create a tokenizer that maps words to numbers for every comment
+tokenizer <- text_tokenizer() %>% fit_text_tokenizer(x_train)
+```
+
+### Examine tokenized data
+
+```{r}
+# Get total number of unique words from tokenizer
 length(tokenizer$word_index)
 
-# view word indices
+# View first/last word indices
 head(tokenizer$word_index)
 tail(tokenizer$word_index)
 ```
 
 ### Vectorize words
 
-One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Therefore, we can use an embedded layer in a neural network to represent the significance of sequences (sequences of words = comments) according to a predetermined number of dimensions.
+One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Instead, we can use an embedded layer in a neural network to represent the significance of word/sequences in the form of predetermined weights.
 
-To do this, we first need to vectorize every comment according to the word indices created above
+To do this, we need to vectorize every comment according to the tokenized word indices created above.
 
 ```{r}
-# binary mode
-ct_seq <- texts_to_sequences(tokenizer, comment_text)
+# vectorize train and test data
+train_vectors <- texts_to_sequences(tokenizer, x_train)
+test_vectors <- texts_to_sequences(tokenizer, x_test)
 
 # view embeddings
-head(ct_seq)
+head(train_vectors)
 ```
 
 ### Pad tokenized sequences
 
-Due to the fact that every sequence (comment) is of variable length, we need to standardize each sequence before it can be fed to the neural network, which expects a fixed size input. To do this, we need to do 2 things:
+Due to the fact that every sequence (comment) is of variable length, we need to standardize each sequence input before it can be fed to the neural network (which expects a fixed size input). This step involves:
 
+* Determine the average length of comments
 * Set a max sequence length, called the input_size
 * For sequences less than max input size, pad these vectors with 0s.
 
 ```{r}
+train_vector_lengths <- sapply(train_vectors, length)
+hist(tv_len, main = "Train Vector Lengths Distribution")
+quantile(train_vector_lengths, probs = c(0.05, .95))
+```
+
+As we can see above, the histogram contains a highly left-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is at a length of 228. So we can use this length as the input_size.
+
+```{r}
 # set input dimensions
-input_size = 80
+input_size = 228
 
 # Pad sequences
-ct_seq_padded <- pad_sequences(ct_seq, maxlen = input_size, padding = "post")
+x_train <- pad_sequences(train_vectors, maxlen = input_size, padding = "post")
+x_test <- pad_sequences(test_vectors, maxlen = input_size, padding = "post")
 
-# View padded
-head(ct_seq_padded)
+# View padded sequences
+head(x_train)
 ```
 
 ### Create keras model
