@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r message=FALSE, warning=FALSE, include=FALSE}
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(keras, ggplot2)
+pacman::p_load(keras, ggplot2, dplyr)
 ```
 
 ## Dataset description
@@ -29,17 +29,50 @@ The methodology used in this project to perform text classification is a form of
 
 ## Text visualization and variable identification
 
+Before viewing comments data, it makes sense to first review the articles for which readers write comments.
+
 ### Read in articles data and compute number of articles
 
 ```{r}
 # read in articles
 articles <- read.csv("nyt-comments/ArticlesApril2017.csv", header = T)
-articles <- articles[,c("articleID","headline")]
+articles <- as.data.frame(articles[,c("articleID","headline","newDesk")])
 
 # num unique articles
 num_articles <- length(articles$articleID)
-num_articles
+
+# num unique article topics
+num_topics <- length(unique(articles$newDesk))
 ```
+
+For the month of April 2017, there were `num_articles` published by the NYT (each with distinct headlines). Examples of headlines include:
+
+```{r}
+head(articles)
+```
+
+All `num_articles` above belong to `num_topics` distinct topics. These topics are:
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+topic_tally <- articles %>% count(newDesk, sort=TRUE)
+names(topic_tally) <- c("topic","count")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(topic_tally, aes(x = reorder(topic, -count), y = count))+
+  geom_bar(stat="identity", width=0.7)+
+  labs(title="NYT Article Topics - April 2017", x="Topic", y="Article count") + 
+  scale_fill_brewer(palette="Greens") + 
+  theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(), 
+        axis.line = element_blank(),
+        axis.text.x = element_text(hjust = 1, angle = 50),
+        axis.ticks = element_blank())
+
+```
+
 
 ### Read in comments data and select comment text and label
 
