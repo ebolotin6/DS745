@@ -80,7 +80,7 @@ rm(comments)
 ### Examine comment features/words and their indices
 
 ```{r}
-# num words/indices
+# count total number of unique words
 length(tokenizer$word_index)
 
 # view word indices
@@ -151,6 +151,13 @@ model %>%
   layer_dense(units = 50, activation = "relu") %>% 
   layer_dense(units = num_classes, activation = "softmax") 
 ```
+
+### View model summary
+
+```{r}
+summary(model)
+```
+
 
 ## Findings along with the discussion
 
