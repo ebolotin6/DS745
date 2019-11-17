@@ -53,12 +53,10 @@ head(articles)
 
 All `num_articles` above belong to `num_topics` distinct topics. These topics are:
 
-```{r message=FALSE, warning=FALSE, include=FALSE}
+```{r echo=TRUE, message=FALSE, warning=FALSE}
 topic_tally <- articles %>% count(newDesk, sort=TRUE)
 names(topic_tally) <- c("topic","count")
-```
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
 ggplot(topic_tally, aes(x = reorder(topic, -count), y = count))+
   geom_bar(stat="identity", width=0.7)+
   labs(title="NYT Article Topics - April 2017", x="Topic", y="Article count") + 
@@ -73,32 +71,35 @@ ggplot(topic_tally, aes(x = reorder(topic, -count), y = count))+
 
 ```
 
+We will be training a neural network to predict the topics above based on user comments.
 
 ### Read in comments data and select comment text and label
 
-```{r}
+```{r echo=TRUE}
 # read in data
 comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
-comments <- comments[,c("commentBody","newDesk")]
+comments <- as.data.frame(comments[,c("commentBody","newDesk")])
 
 # examine dataset size
 dim_comments <- dim(comments)
 total_comments <- dim_comments[1]
-total_comments
 ```
 
-### Get a count of classes (news desk) and preview comments and classes
+There are a total of `total_comments` for April 2017.
 
-```{r}
+### Preview comments and compute total classes
+
+Below is a small sample of user comments and their respective topics (classes.)
+
+```{r echo=TRUE}
 # preview comments
-head(comments$commentBody)
+head(as_tibble(comments))
 
 # count unique classes
 num_classes <- length(unique(comments$newDesk))
-num_classes
 ```
 
-For the month of April there were over 243,832 comments for `num_articles` articles
+As mentioned above, there are `num_classes` possible comment classes.
 
 ### Split comments into train and test sets
 
