@@ -171,9 +171,9 @@ model <- keras_model_sequential()
 model %>%
   layer_embedding(input_dim = vocab_len, output_dim = 100) %>%
   layer_global_average_pooling_1d() %>%  
-  layer_dense(units = 75, activation = "relu") %>%
+  layer_dense(units = 50, activation = "relu") %>%
   layer_dropout(rate = 0.10) %>% 
-  layer_dense(units = 50, activation = "relu") %>% 
+  layer_dense(units = 40, activation = "relu") %>% 
   layer_dropout(rate = 0.10) %>% 
   layer_dense(units = num_classes, activation = "softmax")
 
@@ -197,13 +197,32 @@ model %>% compile(
 ### Train model 
 
 ```{r}
+# create checkpoints folder to save model while training
+checkpoint_dir <- "checkpoints"
+dir.create(checkpoint_dir, showWarnings = FALSE)
+filepath <- file.path(checkpoint_dir, "weights.{epoch:02d}-{val_loss:.2f}.hdf5")
+
+# Create checkpoint callback
+cp_callback <- callback_model_checkpoint(
+  filepath = filepath,
+  save_weights_only = TRUE,
+  save_best_only = TRUE,
+  verbose = 0
+)
+
+early_stopping <- callback_early_stopping(patience = 2)
+
+# train model
 history <- model %>% fit(
   x_train, y_train_bin, 
-  epochs = 1, 
+  epochs = 10, 
   batch_size = 128, 
   validation_split = 0.05,
-  verbose = 1
+  verbose = 1,
+  callbacks = list(cp_callback, early_stopping)  # pass callback to training
 )
+
+model %>% save_model_hdf5("nyt_txt_class.h5")
 ```
 
 
