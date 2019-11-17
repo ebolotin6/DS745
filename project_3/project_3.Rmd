@@ -84,18 +84,20 @@ rm(comments)
 
 ### Tokenize text
 
-Next, we need to create a tokenizer that will map words to numbers.
+Next, create a tokenizer that will map words to numbers.
 
 ```{r}
+vocab_size = 30000
 # create a tokenizer that maps words to numbers for every comment
-tokenizer <- text_tokenizer() %>% fit_text_tokenizer(x_train)
+tokenizer <- text_tokenizer(num_words = vocab_size) %>% fit_text_tokenizer(x_train)
 ```
 
 ### Examine tokenized data
 
 ```{r}
 # Get total number of unique words from tokenizer
-length(tokenizer$word_index)
+vocab_len <- length(tokenizer$word_index)
+vocab_len
 
 # View first/last word indices
 head(tokenizer$word_index)
@@ -127,19 +129,20 @@ Due to the fact that every sequence (comment) is of variable length, we need to 
 
 ```{r}
 train_vector_lengths <- sapply(train_vectors, length)
-hist(tv_len, main = "Train Vector Lengths Distribution")
-quantile(train_vector_lengths, probs = c(0.05, .95))
+hist(train_vector_lengths, main = "Train Vector Lengths Distribution")
+quantiles = quantile(train_vector_lengths, probs = c(0.05, .95))
+quantiles
 ```
 
-As we can see above, the histogram contains a highly left-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is at a length of 228. So we can use this length as the input_size.
+As we can see above, the histogram contains a highly left-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is equal to `quantiles[2]` words per comment. So we can use this length as the input_size.
 
 ```{r}
 # set input dimensions
-input_size = 228
+vector_len = quantiles[2]
 
 # Pad sequences
-x_train <- pad_sequences(train_vectors, maxlen = input_size, padding = "post")
-x_test <- pad_sequences(test_vectors, maxlen = input_size, padding = "post")
+x_train <- pad_sequences(train_vectors, maxlen = vector_len, padding = "post")
+x_test <- pad_sequences(test_vectors, maxlen = vector_len, padding = "post")
 
 # View padded sequences
 head(x_train)
@@ -148,7 +151,9 @@ head(x_train)
 ### Create binary matrix from y_train
 
 ```{r}
-y_train <- to.dummy(y_train, "p")
+y_train <- as.factor(y_train)
+y_train_numeric <- as.numeric(y_train)-1
+y_train_bin <- to_categorical(y_train_numeric, num_classes)
 ```
 
 
@@ -159,28 +164,24 @@ y_train <- to.dummy(y_train, "p")
 * Create neural network layers
 
 ```{r}
+# create model
 model <- keras_model_sequential()
 
+# define layers
 model %>%
-  layer_embedding(input_dim = input_size, output_dim = 50) %>%
+  layer_embedding(input_dim = vocab_len, output_dim = 100) %>%
   layer_global_average_pooling_1d() %>%  
-  layer_dense(units = 200, activation = "relu") %>%
-  layer_dropout(rate = 0.10) %>% 
-  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dense(units = 75, activation = "relu") %>%
   layer_dropout(rate = 0.10) %>% 
   layer_dense(units = 50, activation = "relu") %>% 
-  layer_dropout(rate = 0.05) %>% 
-  layer_dense(units = num_classes, activation = "softmax") 
-```
+  layer_dropout(rate = 0.10) %>% 
+  layer_dense(units = num_classes, activation = "softmax")
 
-### View model summary
-
-```{r}
-# model weights
-# model$get_weights()
-
-# model summary
+# view summary
 summary(model)
+
+# view weights
+# model$get_weights()
 ```
 
 ### Define gradient descent optimizer, loss function, and metrics
@@ -197,10 +198,10 @@ model %>% compile(
 
 ```{r}
 history <- model %>% fit(
-  x_train, y_train, 
+  x_train, y_train_bin, 
   epochs = 1, 
   batch_size = 128, 
-  validation_split = 0.2,
+  validation_split = 0.05,
   verbose = 1
 )
 ```
