@@ -39,36 +39,42 @@ num_articles
 ### Read in comments data and select comment text and label
 
 ```{r}
+# read in data
 comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
 comments <- comments[,c("commentBody","newDesk")]
+
+# examine dataset size
+dim(comments)
+
+# define x and y vars
+comment_text <- comments$commentBody
+comments_classes <- comments$newDesk
 ```
+
 
 ### Get a count of classes (news desk) and preview comments and classes
 
 ```{r}
 # preview comments
-head(comments)
+head(comments$commentBody)
 
 # count unique classes
-unique_classes <- length(unique(comments$newDesk))
-unique_classes
-```
-
-
-
-## Examimine data
-
-```{r}
-dim(comments)
+num_classes <- length(unique(comments_classes))
+num_classes
 ```
 
 For the month of April there were over 243,832 comments for `num_articles` articles
 
 ### Tokenize text
 
+Before running supervised learning on our data - we need to translate text into numeric data so that it can be machine-readable.
+
 ```{r}
-comment_text <- comments$commentBody
+# attribute numbers to words for every comment
 tokenizer <- text_tokenizer() %>% fit_text_tokenizer(comment_text)
+
+# detach original data to clear memory
+rm(comments)
 ```
 
 ### Examine comment features/words and their indices
@@ -82,28 +88,33 @@ head(tokenizer$word_index)
 tail(tokenizer$word_index)
 ```
 
-### Create representation of features/words for every comment
+### Vectorize words
 
-One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Therefore, we can use *embeddings* to offer a compact representation of features/words.
+One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Therefore, we can use an embedded layer in a neural network to represent the significance of sequences (sequences of words = comments) according to a predetermined number of dimensions.
+
+To do this, we first need to vectorize every comment according to the word indices created above
 
 ```{r}
-## binary mode
+# binary mode
 ct_seq <- texts_to_sequences(tokenizer, comment_text)
 
-## view embeddings
+# view embeddings
 head(ct_seq)
 ```
 
-### Pad tokenized embeddings
+### Pad tokenized sequences
 
-Due to the fact that every comment is of variable length as evidenced above, we need to standardize each tokenized sequence before feeding it to our neural network, which expects a fixed size input. To do this, we need to do 2 things:
+Due to the fact that every sequence (comment) is of variable length, we need to standardize each sequence before it can be fed to the neural network, which expects a fixed size input. To do this, we need to do 2 things:
 
-* Set a max length of 21 elements (words) per comment
-* For sequences with less than 21 elements, pad these vectors with 0s.
+* Set a max sequence length, called the input_size
+* For sequences less than max input size, pad these vectors with 0s.
 
 ```{r}
+# set input dimensions
+input_size = 80
+
 # Pad sequences
-ct_seq_padded <- pad_sequences(ct_seq, maxlen = 21, padding = "post")
+ct_seq_padded <- pad_sequences(ct_seq, maxlen = input_size, padding = "post")
 
 # View padded
 head(ct_seq_padded)
@@ -115,9 +126,30 @@ head(ct_seq_padded)
 model <- keras_model_sequential()
 ```
 
+### Created embedding layer to represent vectorized words in compact form
+
+Below, we arbitrarily chose to represent each vector in 10 dimensions
+
 ```{r}
 model %>% 
-  layer_embedding(input_dim = 21, output_dim = 4) 
+  layer_embedding(input_dim = input_size, output_dim = 10) %>%
+  layer_global_average_pooling_1d()
+```
+
+### View model weights
+
+```{r}
+model$get_weights()
+```
+
+### Create neural network layers
+
+```{r}
+model %>% 
+  layer_dense(units = 200, activation = "relu") %>% 
+  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dense(units = 50, activation = "relu") %>% 
+  layer_dense(units = num_classes, activation = "softmax") 
 ```
 
 ## Findings along with the discussion
