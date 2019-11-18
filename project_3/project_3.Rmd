@@ -16,15 +16,17 @@ pacman::p_load(keras, ggplot2, dplyr, tidytext)
 
 ## Dataset description
 
-The dataset that I have chosen to use for this is analysis/project is New York Times comments data [1]. This open-source dataset contains NYT articles and (reader) comments from January to May 2017 and January to April 2018. As mentioned in the linked dataset description, the comments' data contains "over 2 million comments and 34 features", while the articles' data contains more than 9000 articles 16 features.
+The dataset I have chosen to use for this project is comments and articles data from the New York Times [1]. This open-source dataset contains NYT reader's comments for articles from January to May 2017 and January to April 2018. The comments data contains "over 2 million comments and 34 features", while the articles data contains more than 9000 articles and 16 features.
+
+Due to the large size of the data, I have chosen 1 month's worth of comments data (April 2018) to analyze. As seen below, this month contains well over 240,000 comments, which is a sufficient volume for the scope of this project.
 
 ## Objective
 
-The objective of this project is to analyze the comments of NYT readers with the goal of classifying comments into distinct article topics. Article topics are defined by editors of the NYT in column entitled "newDesk" that we will review below.
+The objective of this project is perform text classification to predict article topic from comments text. We will perform supervised learning on **comments text** and **section heading** to predict **article topic**. Article topics are defined by editors of the NYT in column entitled "newDesk".
 
 ## Methodology: steps detailing how the analysis was carried out
 
-The methodology used in this project to perform **text classification** is a form of **supervised learning**. Namely, a neural network (multiple layer perceptron) is trained on *comments data* to predict *article topic*.
+The methodology used in this project to perform **text classification** is a form of **supervised learning** known as **deep learning**. Namely, we will train a neural network (multiple layer perceptron) to make predictions.
 
 ## Text visualization and variable identification
 
@@ -35,44 +37,46 @@ Before viewing comments data, it makes sense to first review the articles for wh
 ```{r}
 # read in articles
 articles <- read.csv("nyt-comments/ArticlesApril2018.csv", header = T)
-articles <- as.data.frame(articles[,c("articleID","headline","newDesk", "sectionName")])
+articles <- as_tibble(articles[,c("headline","newDesk", "sectionName")])
 
 # num unique articles
-num_articles <- length(articles$articleID)
+num_articles <- length(articles$headline)
 
 # num unique article topics
 num_topics <- length(unique(articles$newDesk))
 ```
 
-For the month of April 2017, there were `num_articles` published by the NYT (each with distinct headlines). **Examples** of headlines include:
+For the month of April 2018, there were `num_articles` published by the NYT (each with distinct headlines). **Examples** of headlines include:
 
 ```{r}
-head(articles)
+head(articles[articles$headline != "Unknown",])
 ```
 
-All `num_articles` above belong to `num_topics` distinct topics. These topics are:
+All `num_articles` above belong to `num_topics` distinct topics. The `nrow(topic_tally[topic_tally$count>10,])` most frequent are plotted:
 
 ```{r echo=TRUE, message=FALSE, warning=FALSE}
+# create aggregate table
 topic_tally <- articles %>% count(newDesk, sort=TRUE)
 names(topic_tally) <- c("topic","count")
 
-ggplot(topic_tally, aes(x = reorder(topic, -count), y = count))+
+# plot topic frequency
+ggplot(topic_tally[topic_tally$count>10,], aes(x = reorder(topic, -count), y = count))+
   geom_bar(stat="identity", width=0.7)+
-  labs(title="NYT Article Topics - April 2017", x="Topic", y="Article count") + 
+  labs(title="NYT Article Topics - April 2018", x="Topic", y="Article count") + 
   scale_fill_brewer(palette="Greens") + 
   theme_bw() + 
   theme(panel.border = element_blank(), 
         panel.grid.major = element_blank(), 
-        panel.grid.minor = element_blank(), 
+        panel.grid.minor = element_blank(),
         axis.line = element_blank(),
-        axis.text.x = element_text(hjust = 1, angle = 50),
+        axis.text.x = element_text(hjust = .8, angle = 50, size = 10),
         axis.ticks = element_blank())
 
 ```
 
-We will be training a neural network to predict the topics above based on user comments.
+We will be training a neural network to predict the topics above based on user comments and section heading/name.
 
-### Read in comments data and select comment text and label
+### Read in comments data
 
 ```{r}
 # read in data
@@ -84,11 +88,11 @@ dim_comments <- dim(comments)
 total_comments <- dim_comments[1]
 ```
 
-There are a total of `total_comments` for April 2017.
+There are a total of `total_comments` for April 2018.
 
 ### Preview comments and compute total classes
 
-Below is a small sample of user comments and their respective topics (classes.)
+Below is a small sample of user comments:
 
 ```{r echo=TRUE}
 # preview comments
@@ -98,37 +102,41 @@ head(comments)
 num_classes <- length(unique(comments$newDesk))
 ```
 
-As mentioned above, there are `num_classes` possible comment classes. Before proceeding, we will remove any comments with an "Unknown" section name, as well as any comments with NA, and drop unused levels.
+As mentioned above, there are `num_classes` possible comment classes. 
+
+Next, we will remove any comments with an "Unknown" section name, as well as any comments with NA, and drop unused levels.
 
 ```{r}
 comments <- comments[comments$sectionName != 'Unknown',]
+comments$commentBody <- as.character(comments$commentBody)
 comments <- na.omit(comments)
 comments <- droplevels.data.frame(comments)
 num_rows <- nrow(comments)
 ```
 
-We now have `num_rows` comments to analyze.
+We now have `num_rows` comments to train on.
 
 ### Split comments into train and test sets
 
 ```{r}
 set.seed(39)
+
+# shuffle data to ensure train and test subsets contain approximately normally distributed classes
 new_indices <- sample(num_rows, replace = FALSE)
 comments <- comments[new_indices,]
+
+# sample train and test indices
 num_train_samples <- round(num_rows * 0.90)
 train_indices <- sample(1:num_rows, num_train_samples, replace = FALSE)
 test_indices <- setdiff(1:num_train_samples, train_indices)
 ```
 
 ```{r}
-# define x and y vars
+# create train/test datasets
 x_train <- comments[train_indices, c("commentBody","sectionName")]
 y_train <- comments$newDesk[train_indices]
 x_test <- comments[test_indices, c("commentBody","sectionName")]
 y_test <- comments$newDesk[test_indices]
-
-# detach original data to clear memory
-# rm(comments)
 ```
 
 ### Analyze text
@@ -146,11 +154,11 @@ There are approximately `num_unique_words` unique words in our corpus.
 
 ### Tokenize text
 
-Create a tokenizer that will map words to numbers for every comment, up to a maximum of unique words. 
+Create a tokenizer that will map words to numbers for every comment (up to a maximum of unique words). 
 
 ```{r}
-vocab_len = num_unique_words
 # create a tokenizer that maps words to numbers for every comment
+vocab_len = num_unique_words
 tokenizer <- text_tokenizer(num_words = vocab_len) %>% fit_text_tokenizer(x_train$commentBody)
 ```
 
@@ -167,7 +175,7 @@ tail(tokenizer$word_index)
 
 ### Create binary vectors of words
 
-One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Instead, with neural networks we can use an embedded layer to calculate a fixed number of weights/coefficients that will represent word-sequences in more compact form.
+One-hot-coding every word for every comment (i.e. producing a binary word-vector for every word of every comment) is very computationally expensive. Instead, with neural networks we can use an embedded layer to represent word-sequences in more compact form (by using a fixed number of coefficients).
 
 To do this, we need to vectorize every comment according to the tokenized word indices created above.
 
@@ -176,13 +184,13 @@ To do this, we need to vectorize every comment according to the tokenized word i
 train_vectors <- texts_to_sequences(tokenizer, x_train$commentBody)
 test_vectors <- texts_to_sequences(tokenizer, x_test$commentBody)
 
-# view sample sequence
+# view sample sequence for first comment
 head(train_vectors, 1)
 ```
 
 ### Pad tokenized sequences
 
-Due to the fact that every word-sequence (comment) is of variable length, each sequence should be standardized to a fixed length before it can be fed to the neural network (which expects every input to have a equal/fixed size).
+Due to the fact that every word-sequence is of variable length, each sequence should be standardized to a fixed length before it can be fed to the neural network (which expects every input to have a common size).
 
 **First**: Analyze the length of comments
 
@@ -192,9 +200,9 @@ hist(train_vector_lengths, main = "Train Vector Lengths Distribution")
 quantiles = quantile(train_vector_lengths, probs = c(0.05, .95))
 ```
 
-As we can see above, the histogram contains a highly left-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is equal to `quantiles[2]` words per comment. So we can use this length as the input_size.
+The histogram shows a highly right-skewed distribution. We can see that length bottoms out near 300 words per comment (sequence). However, the 95% quantile is equal to `quantiles[2]` words per comment. So we can use this length as the input_size.
 
-**Next**: Set a max sequence length to `quantiles[2]` words and pad vectors less than this with 0.
+**Next**: Set a max sequence length to `quantiles[2]` words and pad vectors less than this with zeros.
 
 ```{r}
 # set input dimensions
@@ -204,9 +212,11 @@ vector_len = quantiles[2]
 x_train <- pad_sequences(train_vectors, maxlen = vector_len, padding = "post")
 x_test <- pad_sequences(test_vectors, maxlen = vector_len, padding = "post")
 
-# View padded sequences (1 sequence shown)
+# VIew padded sequence (1 sequence shown)
 head(x_train, 1)
 ```
+
+Above is an example of a padded sequence.
 
 ### Create binary matrix of target variables for train/test sets
 
@@ -222,7 +232,7 @@ y_test_bin <- to_categorical(y_test_numeric, num_classes)
 
 ### Create Keras model
 
-Below is the neural network architecture. We are using a sequential model with 4 fully connected layers, 1 pooling layer, and 2 dropout layers. Notice the use of the embedding layer to represent vectorized words in compact form (input dim = `vocab_len` and output = 100).
+Below is the neural network architecture. We are using a sequential model with 4 fully connected layers, 1 pooling layer, and 2 dropout layers. Notice the use of the embedding layer to represent vectorized words in compact form (input dim = `vocab_len` and output = 300).
 
 ```{r warning=FALSE}
 # create model
@@ -240,16 +250,15 @@ model %>%
 
 # view summary
 summary(model)
-
-# view weights
-# model$get_weights()
 ```
+
+This architecture has a large amount of weights: 24.7M, which is overly complex for the task at hand. I selected this architecture to demonstrate an important training principle (regarding text classification) with neural networks, which I discuss in the conclusion section.
 
 ### Compile model
 
 Define gradient descent optimizer, loss function, and metrics
 
-```{r eval=FALSE, include=TRUE}
+```{r}
 model %>% compile(
   optimizer = 'adam',
   loss = 'categorical_crossentropy',
@@ -288,21 +297,21 @@ history <- model %>% fit(
   verbose = 1,
   callbacks = list(cp_callback, early_stopping)  # pass callback to training
 )
-
-# model %>% save_model_hdf5("nyt_txt_class.h5")
-```
-
-### Load bests model for plotting
-
-```{r}
-load_model_weights_hdf5(model, filepath, by_name = FALSE,
-  skip_mismatch = FALSE, reshape = FALSE)
 ```
 
 ### Plot model training
 
-```{r}
+```{r eval=FALSE, include=TRUE}
 plot(history)
+```
+
+### Load best model for plotting
+
+I included this step for those that wish to load a previously trained model in order to evaluate on a test set.
+
+```{r}
+load_model_weights_hdf5(model, filepath, by_name = FALSE,
+  skip_mismatch = FALSE, reshape = FALSE)
 ```
 
 ### Evaluate model performance
@@ -311,13 +320,21 @@ plot(history)
 model %>% evaluate(x_test, y_test_bin, verbose = 0)
 ```
 
-### Generate predictions on new data
+## Findings along with the discussion
+
+As we see from the evaluation of the model on the test data, the model produces **~63%** classification accuracy on the test set (`nrow(x_test)` observations and `num_classes` classes). This is not a good result.
+
+The training plot is highly indicative of what is happening here. From the training plot we can see that model begins to overfit the training set at the 5th epoch. By the 10th epoch, validation accuracy has peaked at ~63%, while training accuracy peaks at the 13th epoch at 81%.
+
+Why does the model have poor prediction accuracy? This is due to the generic nature of comments on NYT articles and the topics created for them. Many comments are simply not characteristic of any singular topic. Take for example this subset of comments with a *newsDesk* title of 'Sports' and *sectionName* of 'Pro Football':
 
 ```{r}
-model %>% predict_classes(x_test)
+slice(comments[comments$newDesk == "Sports" & comments$sectionName == "Pro Football",], 50:60)
 ```
 
-## Findings along with the discussion
+The conversation in these comments is about harassment, lawsuits, and discrimination against cheerleaders. There is no actual conversation about sports, athletes, or NFL games. The real classification topic here is *politics*. Such is also the case with the comments from NYT April 2017 regarding Colin Kaepernick. When Kaepernick created a political movement by taking a knee during the national anthem, all of the comments in response to the subsequent NYT article had to do with the political repercussions as well as Donald Trump.
+
+So the neural network has a difficult time distinguishing comments that could truly belong to multiple classes. It cannot accurately classify such comments **given this amount of data**.
 
 ## References
 
