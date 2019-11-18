@@ -104,7 +104,6 @@ As mentioned above, there are `num_classes` possible comment classes. Before pro
 comments <- comments[comments$sectionName != 'Unknown',]
 comments <- na.omit(comments)
 comments <- droplevels.data.frame(comments)
-# comments <- sapply(comments, as.factor)
 num_rows <- nrow(comments)
 ```
 
@@ -123,9 +122,9 @@ test_indices <- setdiff(1:num_train_samples, train_indices)
 
 ```{r}
 # define x and y vars
-x_train <- comments$commentBody[train_indices]
+x_train <- comments[train_indices, c("commentBody","sectionName")]
 y_train <- comments$newDesk[train_indices]
-x_test <- comments$commentBody[test_indices]
+x_test <- comments[test_indices, c("commentBody","sectionName")]
 y_test <- comments$newDesk[test_indices]
 
 # detach original data to clear memory
@@ -134,7 +133,7 @@ y_test <- comments$newDesk[test_indices]
 
 ### Analyze text
 
-The comments/text need to be converted into machine readable form (numeric form) before we can work with them. Let's first analyze how many unique words we have in our dataset.
+The comments/text need to be converted into machine readable form (numeric form) before we can work with them. Let's first analyze how many unique words we have in our dataset. Note that this is just a rough estimate, because we have not (yet) filtered symbols and other non-needed characters from the comments.
 
 ```{r}
 comment_id <- tibble(idx = length(x_train), text = as.character(x_train))
@@ -143,7 +142,7 @@ tokenized_tibble <- comment_id %>%
 num_unique_words <- length(unique(tokenized_tibble$word))
 ```
 
-There are `num_unique_words` unique words in our corpus.
+There are approximately `num_unique_words` unique words in our corpus.
 
 ### Tokenize text
 
@@ -152,16 +151,14 @@ Create a tokenizer that will map words to numbers for every comment, up to a max
 ```{r}
 vocab_len = num_unique_words
 # create a tokenizer that maps words to numbers for every comment
-tokenizer <- text_tokenizer(num_words = vocab_len) %>% fit_text_tokenizer(x_train)
-len_tokens <- length(tokenizer$word_index)
+tokenizer <- text_tokenizer(num_words = vocab_len) %>% fit_text_tokenizer(x_train$commentBody)
 ```
 
 ### Examine tokenized data
 
 ```{r}
-# Get total number of unique words from tokenizer
-# vocab_len <- length(tokenizer$word_index)
-# vocab_len
+# Get actual number of unique words from tokenizer
+vocab_len <- length(tokenizer$word_index)
 
 # View first/last word indices
 head(tokenizer$word_index)
@@ -176,8 +173,8 @@ To do this, we need to vectorize every comment according to the tokenized word i
 
 ```{r}
 # vectorize train and test data
-train_vectors <- texts_to_sequences(tokenizer, x_train)
-test_vectors <- texts_to_sequences(tokenizer, x_test)
+train_vectors <- texts_to_sequences(tokenizer, x_train$commentBody)
+test_vectors <- texts_to_sequences(tokenizer, x_test$commentBody)
 
 # view sample sequence
 head(train_vectors, 1)
@@ -227,17 +224,17 @@ y_test_bin <- to_categorical(y_test_numeric, num_classes)
 
 Below is the neural network architecture. We are using a sequential model with 4 fully connected layers, 1 pooling layer, and 2 dropout layers. Notice the use of the embedding layer to represent vectorized words in compact form (input dim = `vocab_len` and output = 100).
 
-```{r message=FALSE, warning=FALSE}
+```{r warning=FALSE}
 # create model
 model <- keras_model_sequential()
 
 # define layers
 model %>%
-  layer_embedding(input_dim = vocab_len-1, output_dim = 100) %>%
+  layer_embedding(input_dim = vocab_len, output_dim = 300) %>%
   layer_global_average_pooling_1d() %>%  
-  layer_dense(units = 200, activation = "relu") %>%
+  layer_dense(units = 150, activation = "relu") %>%
   layer_dropout(rate = 0.15) %>% 
-  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dense(units = 75, activation = "relu") %>% 
   layer_dropout(rate = 0.15) %>%
   layer_dense(units = num_classes, activation = "softmax")
 
@@ -248,24 +245,30 @@ summary(model)
 # model$get_weights()
 ```
 
-### Define gradient descent optimizer, loss function, and metrics
+### Compile model
 
-```{r}
+Define gradient descent optimizer, loss function, and metrics
+
+```{r eval=FALSE, include=TRUE}
 model %>% compile(
-  optimizer = optimizer_rmsprop(),
+  optimizer = 'adam',
   loss = 'categorical_crossentropy',
   metrics = 'accuracy'
 )
 ```
 
-### Train model 
+# Define save/load directory
 
-```{r warning=FALSE}
+```{r}
 # create checkpoints folder to save model while training
 checkpoint_dir <- "checkpoints"
 dir.create(checkpoint_dir, showWarnings = FALSE)
-filepath <- file.path(checkpoint_dir, "weights.{epoch:02d}-{val_loss:.2f}.hdf5")
+filepath <- file.path(checkpoint_dir, "best_model.hdf5")
+```
 
+### Train model
+
+```{r eval=FALSE, warning=FALSE, include=TRUE}
 # Create checkpoint callback
 cp_callback <- callback_model_checkpoint(
   filepath = filepath,
@@ -274,19 +277,26 @@ cp_callback <- callback_model_checkpoint(
   verbose = 0
 )
 
-early_stopping <- callback_early_stopping(patience = 10)
+early_stopping <- callback_early_stopping(patience = 3)
 
 # train model
 history <- model %>% fit(
   x_train, y_train_bin, 
   epochs = 20, 
   batch_size = 1280, 
-  validation_split = 0.05,
+  validation_split = 0.20,
   verbose = 1,
   callbacks = list(cp_callback, early_stopping)  # pass callback to training
 )
 
 # model %>% save_model_hdf5("nyt_txt_class.h5")
+```
+
+### Load bests model for plotting
+
+```{r}
+load_model_weights_hdf5(model, filepath, by_name = FALSE,
+  skip_mismatch = FALSE, reshape = FALSE)
 ```
 
 ### Plot model training
