@@ -300,6 +300,6 @@ model %>% predict_classes(x_test)
 
 ## Findings along with the discussion
 
-## References (last page)
+## References
 
 [1] https://www.kaggle.com/aashita/nyt-comments
