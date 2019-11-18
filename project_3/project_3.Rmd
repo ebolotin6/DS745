@@ -34,8 +34,8 @@ Before viewing comments data, it makes sense to first review the articles for wh
 
 ```{r}
 # read in articles
-articles <- read.csv("nyt-comments/ArticlesApril2017.csv", header = T)
-articles <- as.data.frame(articles[,c("articleID","headline","newDesk")])
+articles <- read.csv("nyt-comments/ArticlesApril2018.csv", header = T)
+articles <- as.data.frame(articles[,c("articleID","headline","newDesk", "sectionName")])
 
 # num unique articles
 num_articles <- length(articles$articleID)
@@ -76,8 +76,8 @@ We will be training a neural network to predict the topics above based on user c
 
 ```{r}
 # read in data
-comments <- read.csv("nyt-comments/CommentsApril2017.csv", header = T)
-comments <- as_tibble(comments[,c("commentBody","newDesk")])
+comments <- read.csv("nyt-comments/CommentsApril2018.csv", header = T)
+comments <- as_tibble(comments[,c("commentBody","newDesk", "sectionName")])
 
 # examine dataset size
 dim_comments <- dim(comments)
@@ -98,14 +98,26 @@ head(comments)
 num_classes <- length(unique(comments$newDesk))
 ```
 
-As mentioned above, there are `num_classes` possible comment classes.
+As mentioned above, there are `num_classes` possible comment classes. Before proceeding, we will remove any comments with an "Unknown" section name, as well as any comments with NA, and drop unused levels.
+
+```{r}
+comments <- comments[comments$sectionName != 'Unknown',]
+comments <- na.omit(comments)
+comments <- droplevels.data.frame(comments)
+# comments <- sapply(comments, as.factor)
+num_rows <- nrow(comments)
+```
+
+We now have `num_rows` comments to analyze.
 
 ### Split comments into train and test sets
 
 ```{r}
-set.seed(30)
-num_train_samples <- round(total_comments * 0.80)
-train_indices <- sample(1:total_comments, num_train_samples, replace = FALSE)
+set.seed(39)
+new_indices <- sample(num_rows, replace = FALSE)
+comments <- comments[new_indices,]
+num_train_samples <- round(num_rows * 0.90)
+train_indices <- sample(1:num_rows, num_train_samples, replace = FALSE)
 test_indices <- setdiff(1:num_train_samples, train_indices)
 ```
 
@@ -117,7 +129,7 @@ x_test <- comments$commentBody[test_indices]
 y_test <- comments$newDesk[test_indices]
 
 # detach original data to clear memory
-rm(comments)
+# rm(comments)
 ```
 
 ### Analyze text
@@ -167,7 +179,7 @@ To do this, we need to vectorize every comment according to the tokenized word i
 train_vectors <- texts_to_sequences(tokenizer, x_train)
 test_vectors <- texts_to_sequences(tokenizer, x_test)
 
-# view embeddings
+# view sample sequence
 head(train_vectors, 1)
 ```
 
@@ -221,12 +233,12 @@ model <- keras_model_sequential()
 
 # define layers
 model %>%
-  layer_embedding(input_dim = len_tokens-1, output_dim = 100) %>%
+  layer_embedding(input_dim = vocab_len-1, output_dim = 100) %>%
   layer_global_average_pooling_1d() %>%  
-  layer_dense(units = 50, activation = "relu") %>%
-  layer_dropout(rate = 0.10) %>% 
-  layer_dense(units = 40, activation = "relu") %>% 
-  layer_dropout(rate = 0.10) %>% 
+  layer_dense(units = 200, activation = "relu") %>%
+  layer_dropout(rate = 0.15) %>% 
+  layer_dense(units = 100, activation = "relu") %>% 
+  layer_dropout(rate = 0.15) %>%
   layer_dense(units = num_classes, activation = "softmax")
 
 # view summary
@@ -240,7 +252,7 @@ summary(model)
 
 ```{r}
 model %>% compile(
-  optimizer = 'adam',
+  optimizer = optimizer_rmsprop(),
   loss = 'categorical_crossentropy',
   metrics = 'accuracy'
 )
@@ -248,7 +260,7 @@ model %>% compile(
 
 ### Train model 
 
-```{r}
+```{r warning=FALSE}
 # create checkpoints folder to save model while training
 checkpoint_dir <- "checkpoints"
 dir.create(checkpoint_dir, showWarnings = FALSE)
@@ -262,13 +274,13 @@ cp_callback <- callback_model_checkpoint(
   verbose = 0
 )
 
-early_stopping <- callback_early_stopping(patience = 2)
+early_stopping <- callback_early_stopping(patience = 10)
 
 # train model
 history <- model %>% fit(
   x_train, y_train_bin, 
-  epochs = 1, 
-  batch_size = 128, 
+  epochs = 20, 
+  batch_size = 1280, 
   validation_split = 0.05,
   verbose = 1,
   callbacks = list(cp_callback, early_stopping)  # pass callback to training
@@ -277,20 +289,17 @@ history <- model %>% fit(
 # model %>% save_model_hdf5("nyt_txt_class.h5")
 ```
 
-
 ### Plot model training
 
 ```{r}
 plot(history)
 ```
 
-
 ### Evaluate model performance
 
 ```{r}
 model %>% evaluate(x_test, y_test_bin, verbose = 0)
 ```
-
 
 ### Generate predictions on new data
 

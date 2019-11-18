@@ -1,4 +1,4 @@
-/checkpoints
+checkpoints/
 *.h5
 L*/
 .DS_Store
