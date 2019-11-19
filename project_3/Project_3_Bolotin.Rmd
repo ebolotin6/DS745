@@ -25,11 +25,11 @@ pacman::p_load(keras, ggplot2, dplyr, tidytext)
 
 The dataset I have chosen to use for this project is comments and articles data from the New York Times [1]. This open-source dataset contains NYT reader's comments for articles from January to May 2017 and January to April 2018. The comments data contains "over 2 million comments and 34 features", while the articles data contains more than 9000 articles and 16 features.
 
-Due to the large size of the data, I have chosen 1 month's worth of comments data (April 2018) to analyze. As seen below, this month contains well over 240,000 comments, which is a sufficient volume for the scope of this project.
+Due to the large size of the complete dataset, I have chosen only 1 month's worth of comments data (April 2018) to analyze. As seen below, this month contains well over 260,000 comments, which is a sufficient volume for the scope of this project.
 
 # Objective
 
-The objective of this project is perform text classification to predict article topic from comments text. We will perform supervised learning on **comments text** and **section heading** to predict **article topic**. Article topics are defined by editors of the NYT in column entitled "newDesk".
+The objective of this project is perform text classification to predict article topic. We will perform supervised learning on **comments text** and **section heading** to predict **article topic**. Article topics are defined by editors of the NYT in column entitled "newDesk".
 
 # Methodology
 
