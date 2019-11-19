@@ -324,18 +324,22 @@ model %>% evaluate(x_test, y_test_bin, verbose = 0)
 
 As we see from the evaluation of the model on the test data, the model produces **~63%** classification accuracy on the test set (`nrow(x_test)` observations and `num_classes` classes). This is not a good result.
 
-The training plot is highly indicative of what is happening here. From the training plot we can see that model begins to overfit the training set at the 5th epoch. By the 10th epoch, validation accuracy has peaked at ~63%, while training accuracy peaks at the 13th epoch at 81%.
+The training plot is highly indicative of what is happening here. From the training plot we see that model begins to overfit the training set at the 5th epoch. By the 10th epoch, validation accuracy has peaked at ~63%, while training accuracy peaks at 81% (13th epoch).
 
-Why does the model have poor prediction accuracy? This is due to the generic nature of comments on NYT articles and the topics created for them. Many comments are simply not characteristic of any singular topic. Take for example this subset of comments with a *newsDesk* title of 'Sports' and *sectionName* of 'Pro Football':
+Why does the model have poor prediction accuracy on the test set? This is due to the generic nature of reader comments for NYT articles (and the topics created for them). Many comments are simply not characteristic of any singular topic. Take for example this subset of comments with a *newsDesk* title of 'Sports' and *sectionName* of 'Pro Football':
 
 ```{r}
 slice(comments[comments$newDesk == "Sports" & comments$sectionName == "Pro Football",], 50:60)
 ```
 
-The conversation in these comments is about harassment, lawsuits, and discrimination against cheerleaders. There is no actual conversation about sports, athletes, or NFL games. The real classification topic here is *politics*. Such is also the case with the comments from NYT April 2017 regarding Colin Kaepernick. When Kaepernick created a political movement by taking a knee during the national anthem, all of the comments in response to the subsequent NYT article had to do with the political repercussions as well as Donald Trump.
+The conversation in these comments is about harassment, lawsuits, and discrimination against cheerleaders. There is no actual conversation about sports, athletes, or NFL games. The more accurate classification topic here is *politics* or perhaps *culture*. Such is also the case with reader comments from NYT April 2017 regarding Colin Kaepernick. When Kaepernick created a political movement by taking a knee during the national anthem of a football game, all of the comments in response to the subsequent NYT article had to do with the political repercussions (as well as the reactions of Donald Trump).
 
-So the neural network has a difficult time distinguishing comments that could truly belong to multiple classes. It cannot accurately classify such comments **given this amount of data**.
+So the neural network, which assigns weights to words, has a difficult time distinguishing statements that could easily belong to multiple categories - as this is exactly the case in the training data. In result, the neural network cannot accurately classify polysemantic comments, at least **given the amount of data used in this project**.
 
 ## References
 
-[1] https://www.kaggle.com/aashita/nyt-comments
+[1] NYT Dataset, https://www.kaggle.com/aashita/nyt-comments
+[2] Keras for R, https://blog.rstudio.com/2017/09/05/keras-for-r/
+[3] Intro to text classification, https://www.onceupondata.com/2019/01/21/keras-text-part1/ 
+[4] Preparing data for NLP, https://shirinsplayground.netlify.com/2019/01/text_classification_keras_data_prep/
+[5] Text classification in R, https://www.jla-data.net/eng/vocabulary-based-text-classification/
