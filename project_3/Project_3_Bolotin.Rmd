@@ -4,7 +4,7 @@ description: "DS 745"
 author: "Eli (Ilya) Bolotin"
 date: "11/14/2019"
 output: 
-  word_document:
+  pdf_document:
     toc: true
     df_print: default
 header-includes:
@@ -310,6 +310,8 @@ history <- model %>% fit(
 ```{r eval=FALSE, include=TRUE}
 plot(history)
 ```
+
+![Training and validation loss/acc](000005.png)
 
 ## Load best model for plotting
 
